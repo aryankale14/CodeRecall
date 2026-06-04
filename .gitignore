@@ -21,3 +21,4 @@ __pycache__/
 # System files
 .DS_Store
 Thumbs.db
+run.txt
