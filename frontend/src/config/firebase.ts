@@ -69,16 +69,8 @@ export const signInWithGoogle = async (): Promise<any> => {
   }
 
   try {
-    const isMobile = typeof navigator !== "undefined" && 
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      await signInWithRedirect(auth, googleProvider);
-      return null;
-    } else {
-      const result = await signInWithPopup(auth, googleProvider);
-      return result.user;
-    }
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user;
   } catch (error) {
     console.error("Google Sign-in failed:", error);
     throw error;
