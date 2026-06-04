@@ -24,6 +24,8 @@ const PRESETS = [
   "Analyze the dependency layout and suggest architectural upgrades."
 ];
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:9999";
+
 export default function ChatPanel({ repoUrl, user }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -56,7 +58,7 @@ export default function ChatPanel({ repoUrl, user }: ChatPanelProps) {
 
     try {
       const idToken = await getIdToken(user);
-      const response = await fetch("http://127.0.0.1:9999/api/chat", {
+      const response = await fetch(`${BACKEND_URL}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -85,7 +87,7 @@ export default function ChatPanel({ repoUrl, user }: ChatPanelProps) {
       const errorMsg: Message = {
         id: Math.random().toString(),
         sender: "ai",
-        text: "❌ **Failed to retrieve answer from AI service.** Please ensure the FastAPI backend is running on port 9999."
+        text: "❌ **Failed to retrieve answer from AI service.** Please ensure the backend service is running and configured correctly."
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
