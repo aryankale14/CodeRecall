@@ -16,6 +16,7 @@ from app.config import get_settings
 # Looks for 'serviceAccountKey.json' in the backend root directory.
 # If not present, falls back to environment variables or graceful debug mode.
 firebase_initialized = False
+has_service_account = False
 service_key_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "serviceAccountKey.json")
 
 try:
@@ -23,6 +24,7 @@ try:
         cred = credentials.Certificate(service_key_path)
         firebase_admin.initialize_app(cred)
         firebase_initialized = True
+        has_service_account = True
         print("[INFO] Firebase Admin SDK initialized successfully via service account JSON file.")
     else:
         # Graceful initialize using settings or fallback
@@ -32,6 +34,7 @@ try:
         os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
         firebase_admin.initialize_app(options={'projectId': project_id})
         firebase_initialized = True
+        has_service_account = False
         print(f"[INFO] Firebase Admin SDK initialized with project ID: {project_id}")
 except Exception as e:
     print(f"[WARNING] Firebase Admin SDK initialization failed: {str(e)}.")
@@ -175,28 +178,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     settings = get_settings()
     project_id = settings.FIREBASE_PROJECT_ID or "code-reviewer-9019f"
 
-    # Try standard verification first
-    try:
-        decoded_token = auth.verify_id_token(token)
-        uid = decoded_token.get("uid") or decoded_token.get("sub")
-        email = decoded_token.get("email")
-        name = decoded_token.get("name", "CodeRecallUser")
-        
-        # Save mapping of UID -> Email
-        if uid and email:
-            save_user_mapping(uid, email)
-            
-        return {
-            "uid": uid,
-            "email": email,
-            "name": name
-        }
-    except Exception as e:
-        # If standard verification fails (e.g. because of missing service account credentials),
-        # perform manual JWT signature verification as a fully secure fallback.
-        print(f"[INFO] Firebase Admin verification failed ({e}). Falling back to manual verification...")
+    # Try standard verification first ONLY if we have a service account credential
+    if has_service_account:
         try:
-            decoded_token = verify_token_manually(token, project_id)
+            decoded_token = auth.verify_id_token(token)
             uid = decoded_token.get("uid") or decoded_token.get("sub")
             email = decoded_token.get("email")
             name = decoded_token.get("name", "CodeRecallUser")
@@ -210,11 +195,31 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
                 "email": email,
                 "name": name
             }
-        except Exception as manual_err:
-            print(f"[ERROR] Manual Firebase token verification failed: {manual_err}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid or expired Firebase Authentication Token: {str(manual_err)}",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        except Exception as e:
+            # If standard verification fails, perform manual verification as a fallback
+            print(f"[INFO] Firebase Admin verification failed ({e}). Falling back to manual verification...")
+
+    # Manual verification fallback (no service account JSON needed)
+    try:
+        decoded_token = verify_token_manually(token, project_id)
+        uid = decoded_token.get("uid") or decoded_token.get("sub")
+        email = decoded_token.get("email")
+        name = decoded_token.get("name", "CodeRecallUser")
+        
+        # Save mapping of UID -> Email
+        if uid and email:
+            save_user_mapping(uid, email)
+            
+        return {
+            "uid": uid,
+            "email": email,
+            "name": name
+        }
+    except Exception as manual_err:
+        print(f"[ERROR] Manual Firebase token verification failed: {manual_err}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid or expired Firebase Authentication Token: {str(manual_err)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
