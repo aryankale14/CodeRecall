@@ -11,4 +11,5 @@ langchain
 langchain-google-genai
 python-dotenv
 firebase-admin
+langchain-text-splitters
 
