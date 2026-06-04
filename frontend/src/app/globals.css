@@ -2978,7 +2978,7 @@ h2, h3, h4 {
 }
 
 /* --- Mobile Responsive Layout Styles --- */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* Prevent horizontal scroll of body */
   html, body {
     max-width: 100% !important;
@@ -3115,7 +3115,7 @@ h2, h3, h4 {
 }
 
 /* Desktop medium viewport overrides */
-@media (min-width: 769px) {
+@media (min-width: 768px) {
   .mobile-header {
     display: none !important;
   }
