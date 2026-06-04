@@ -36,9 +36,8 @@ import {
   Sun,
   Moon
 } from "lucide-react";
-import { onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { auth, signInWithGoogle, logoutUser, getIdToken } from "../config/firebase";
+import { auth, signInWithGoogle, logoutUser, getIdToken, onAuthStateChanged } from "../config/firebase";
 import Markdown from "../components/Markdown";
 import CodeViewer from "../components/CodeViewer";
 import ChatPanel from "../components/ChatPanel";

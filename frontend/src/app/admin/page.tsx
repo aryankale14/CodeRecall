@@ -18,9 +18,8 @@ import {
   LogOut,
   User as UserIcon
 } from "lucide-react";
-import { onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { auth, getIdToken, logoutUser } from "../../config/firebase";
+import { auth, getIdToken, logoutUser, onAuthStateChanged } from "../../config/firebase";
 
 interface AdminUser {
   email: string;

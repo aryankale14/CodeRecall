@@ -154,6 +154,15 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
 
     token = credentials.credentials
 
+    # If the token is the mock token, bypass verification!
+    if token == "mock_local_developer_token":
+        print("[MOCK AUTH] Verifying Bearer Token locally (Mock Token bypass active)...")
+        return {
+            "uid": "mock_local_developer_uid",
+            "email": "developer@coderecall.local",
+            "name": "Local Developer"
+        }
+
     # If Firebase is not initialized, run in Graceful Local Mock Development mode
     if not firebase_initialized:
         print("[MOCK AUTH] Verifying Bearer Token locally (Mock Mode active)...")
