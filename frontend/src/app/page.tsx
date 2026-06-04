@@ -905,8 +905,8 @@ export default function Home() {
 
       {/* -------------------- SIDEBAR HISTORICAL TRACKER -------------------- */}
       <aside 
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#0c0d12] border-r border-glass flex flex-col transition-transform duration-300 ease-in-out md:relative md:w-80 md:translate-x-0 ${
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        className={`sidebar-historical border-r border-glass flex flex-col transition-transform duration-300 ease-in-out ${
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Brand */}
@@ -1002,7 +1002,7 @@ export default function Home() {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-glass bg-[#08090d] text-center">
+        <div className="sidebar-historical-footer">
           <p className="text-[10px] text-muted">CodeRecall v1.0.0</p>
         </div>
       </aside>
@@ -1010,7 +1010,7 @@ export default function Home() {
       {/* -------------------- MAIN WRAPPER FOR HEADER + WORKSPACE -------------------- */}
       <div className="flex-1 flex flex-col min-height-screen overflow-hidden">
         {/* MOBILE HEADER */}
-        <header className="mobile-header flex items-center justify-between px-4 py-2.5 bg-[#0c0d12]/95 border-b border-glass backdrop-blur-md md:hidden shrink-0 z-30">
+        <header className="mobile-header items-center justify-between px-4 py-2.5 bg-[#0c0d12]/95 border-b border-glass backdrop-blur-md shrink-0 z-30">
           <div className="flex items-center gap-2">
             {/* Hamburger Button */}
             <button 
@@ -1112,7 +1112,7 @@ export default function Home() {
         {/* -------------------- MAIN WORKSPACE AREA -------------------- */}
         <main className="flex-1 flex flex-col bg-deep overflow-hidden p-6 md:p-8 scrollbar relative">
           {/* UNIFIED WORKSPACE TOPBAR */}
-          <header className="workspace-topbar hidden md:flex">
+          <header className="workspace-topbar">
             <div className="topbar-welcome" />
 
           <div className="flex items-center gap-3">

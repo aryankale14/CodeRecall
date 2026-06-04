@@ -2975,7 +2975,9 @@ h2, h3, h4 {
   .lp-hero-cta-primary, .lp-hero-cta-secondary {
     width: 100% !important;
     justify-content: center !important;
+  }
 }
+
 
 /* --- Mobile Responsive Layout Styles --- */
 @media (max-width: 767px) {
@@ -3091,13 +3093,16 @@ h2, h3, h4 {
     z-index: 45 !important;
   }
 
-  aside.fixed {
+  .sidebar-historical {
     position: fixed !important;
     top: 0 !important;
     bottom: 0 !important;
     left: 0 !important;
     height: 100vh !important;
     z-index: 50 !important;
+    width: 288px !important;
+    background-color: var(--bg-surface) !important;
+    display: flex !important;
   }
 
   /* Allow inline code to wrap on mobile */
@@ -3124,10 +3129,14 @@ h2, h3, h4 {
     display: flex !important;
   }
 
-  aside.fixed {
+  .sidebar-historical {
     position: relative !important;
     transform: translateX(0) !important;
     width: 320px !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    z-index: 10 !important;
+    background-color: var(--bg-surface) !important;
     display: flex !important;
   }
 }
@@ -3137,5 +3146,13 @@ h2, h3, h4 {
   .sm\:grid-cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
+}
+
+/* Sidebar footer global styling */
+.sidebar-historical-footer {
+  padding: 16px !important;
+  border-top: 1px solid var(--border-glass) !important;
+  background-color: var(--bg-deep) !important;
+  text-align: center !important;
 }
 
