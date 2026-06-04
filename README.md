@@ -1,184 +1,161 @@
-# 🌌 CodeRecall — AI-Powered Codebase Intelligence
+# 🌌 CodeRecall — AI-Powered Codebase Intelligence Platform
 
-CodeRecall is a premium, responsive repository analysis platform. It uses a custom Map-Reduce agentic workflow to clone, index, audit, and explain entire GitHub codebases. Users can view auto-generated global architecture reports, run comprehensive security audits, inspect file-by-file breakdowns, and chat directly with their codebase using a semantic RAG assistant.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-https%3A%2F%2Fcode--recall1.netlify.app%2F-violet?style=for-the-badge&logo=netlify)](https://code-recall1.netlify.app/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-emerald?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Frontend-Next.js%2016-black?style=for-the-badge&logo=nextdotjs)](https://nextjs.org/)
 
----
+CodeRecall is a premium, fully responsive codebase visualization, analysis, and reasoning platform. Utilizing an advanced, multi-agent **Map-Reduce processing workflow**, CodeRecall shallow-clones repositories in parallel, indexes structural data, extracts vector embeddings, runs automated vulnerability audits, and hosts a context-aware semantic retrieval (RAG) assistant for direct natural language queries.
 
-## ✨ Features
-- **Map-Reduce AI Analysis:** Analyzes individual files in parallel (Map Phase) and synthesizes a master explanation and security audit (Reduce Phase).
-- **Semantic Codebase Q&A:** Chat with your repository using vector embeddings (Gemini Embeddings + PostgreSQL `pgvector`).
-- **Interactive Code Viewer:** Explore file contents directly in the dashboard alongside their AI summaries and component details.
-- **Platform Analytics:** Real-time metrics showing total repositories scanned, active users, and scanned file sizes.
-- **Fully Responsive & Theme-Aware:** Sleek, glassmorphic UI with persistent Dark/Light mode and full mobile layout optimization.
-- **Firebase Auth (Desktop & Mobile):** Unified Google Login with mobile redirection support to bypass browser popup blockers.
+Developed with a professional **light-cream warm minimalist theme (Vibe-Kanban style)** and a persistent dark mode toggle, the platform handles multi-tenant indexing cleanly, features detailed admin activity telemetry, and streamlines Firebase security flows.
 
 ---
 
-## 🛠️ Tech Stack
-* **Frontend:** Next.js (App Router, TypeScript, Vanilla CSS, Lucide Icons)
-* **Backend:** FastAPI (Python, SQLAlchemy, Pydantic)
-* **Database:** PostgreSQL (with `pgvector` extension, hosted on Supabase)
-* **Authentication:** Firebase Auth
-* **AI Engine:** Google Gemini API (`gemini-1.5-flash` & `gemini-1.5-pro`)
+## ✨ Core Features
+
+*   **⚡ Map-Reduce Processing Pipeline:**
+    *   **Map Phase:** Spawns asynchronous worker agents to analyze, summarize, and vectorize individual files in parallel.
+    *   **Reduce Phase:** Aggregates individual file blueprints into a master global architecture report and security catalog.
+*   **🧠 Semantic RAG Q&A Assistant:** Direct codebase chat powered by Google Gemini API and high-performance similarity matching using PostgreSQL `pgvector`.
+*   **🛡️ Multi-Agent Security Audit:** Automated static vulnerability indexing mapping high, medium, and low-priority vulnerabilities across files.
+*   **📂 Interactive Code Explorer:** Browse the codebase hierarchy alongside side-by-side component summaries and code inspectors.
+*   **🎨 Premium Dual-Theme System:** Warm minimal light cream styling and modern dark neon options, with theme settings synced across reloads.
+*   **📱 Mobile-First Design & Popup Bypass:** Optimized touch gestures for dashboard tab navigation, stacked responsive charts, and popup-based Firebase OAuth selectors engineered to bypass mobile third-party cookie restrictions.
+*   **🛡️ Robust Authentication & Verification:** Manual cryptographic verification (RS256 JWT decoding) of Firebase tokens as a fallback to bypass local Admin SDK service credential dependencies.
+*   **📊 Admin Dashboard:** Admin-only view (`/admin`) displaying total user counts, active repositories, scanned files, and detailed per-user activity tables with expandable sub-rows.
 
 ---
 
-## 🏗️ Architecture Overview
+## 🏗️ System Architecture
 
 ```mermaid
 graph TD
-    User([User]) -->|Submits Git URL| Frontend[Next.js Frontend]
-    Frontend -->|Authorized POST| Backend[FastAPI Backend]
-    Backend -->|Clone & Parse| Git[Git Clone / PyGithub]
-    Git -->|Save Files| DB[(Supabase PostgreSQL + pgvector)]
+    User([User]) -->|Submits Repository URL| Frontend[Next.js Frontend]
+    Frontend -->|POST /api/ingest| Backend[FastAPI Backend]
+    Backend -->|Clones Branch| Git[Git Clone Client]
+    Git -->|Parses & Indexes File Trees| DB[(Supabase PostgreSQL + pgvector)]
     
-    Backend -->|Background Task Chaining| MapPhase[Worker Agents: Summarize & Vectorize Files]
-    MapPhase -->|Update DB| DB
-    MapPhase -->|Trigger| ReducePhase[Master Agent: Create Global & Security Report]
-    ReducePhase -->|Save Report| DB
+    Backend -->|Map-Reduce Engine| MapPhase[Worker Agents: Map Phase]
+    MapPhase -->|Generate File Vectors| GeminiEmbed[Gemini Embedding API]
+    GeminiEmbed -->|Store Embeddings| DB
+    MapPhase -->|Trigger Synthesis| ReducePhase[Master Agent: Reduce Phase]
+    ReducePhase -->|Compile Architecture & Audit| DB
     
-    User -->|Ask Question| Chat[RAG Chat Controller]
-    Chat -->|Compute Query Embedding| Gemini[Gemini Embedding API]
-    Gemini -->|Vector Similarity Search| DB
-    DB -->|Context Retrieval| Chat
-    Chat -->|Generate Answer| User
+    User -->|Queries Codebase| Chat[RAG Chat Controller]
+    Chat -->|Generate Query Vector| GeminiEmbed
+    GeminiEmbed -->|Similarity Match| DB
+    DB -->|Retrieve Source Context| Chat
+    Chat -->|Compile Comprehensive Answer| User
 ```
+
+---
+
+## 🛠️ Technology Stack
+
+*   **Frontend:** Next.js 16 (App Router, TypeScript, Vanilla CSS Layout Framework, Lucide Icons)
+*   **Backend:** FastAPI (Python 3.10+, SQLAlchemy, Pydantic)
+*   **Database:** PostgreSQL (Hosted on Supabase with the `pgvector` extension)
+*   **Authentication:** Firebase Auth (Client OAuth flows)
+*   **AI Engine:** Google Gemini API (`gemini-1.5-flash`, `gemini-1.5-pro`, and `text-embedding-004`)
 
 ---
 
 ## 🚀 Local Development Setup
 
 ### 1. Prerequisites
-- Python 3.10+ installed
-- Node.js 18+ installed
-- A PostgreSQL database (e.g., Supabase) with the `pgvector` extension enabled:
+- **Node.js** 18+ and **npm** installed.
+- **Python** 3.10+ installed.
+- **PostgreSQL** database (e.g. Supabase) with `pgvector` enabled:
   ```sql
   CREATE EXTENSION IF NOT EXISTS vector;
   ```
 
 ### 2. Backend Setup
-Navigate into the backend directory:
-```bash
-cd backend
-```
-
-Create a virtual environment and activate it:
-```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# Unix/Mac
-python3 -m venv venv
-source venv/bin/activate
-```
-
-Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-Create a `.env` file in the `backend/` directory:
-```env
-DATABASE_URL=postgresql://postgres.your-supabase-db:password@aws-0-us-east-1.pooler.supabase.com:6543/postgres
-GEMINI_API_KEY_MAP=your_gemini_api_key_1
-GEMINI_API_KEY_REDUCE=your_gemini_api_key_2
-GEMINI_API_KEY_RAG=your_gemini_api_key_3
-FIREBASE_PROJECT_ID=your-firebase-project-id
-```
-*(Tip: You can use the same Gemini API key for all three keys, or split them to distribute rate limit allowances).*
-
-Start the FastAPI server on port 9999:
-```bash
-uvicorn app.main:app --port 9999 --reload
-```
-
----
+1. Navigate into the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Create and activate a virtual environment:
+   ```bash
+   # Windows PowerShell
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1
+   
+   # Linux/Mac
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+3. Install the required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Create a `.env` file inside the `backend/` directory:
+   ```env
+   DATABASE_URL=postgresql://postgres.xxxx:password@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+   GEMINI_API_KEY_MAP=your_gemini_api_key
+   GEMINI_API_KEY_REDUCE=your_gemini_api_key
+   GEMINI_API_KEY_RAG=your_gemini_api_key
+   FIREBASE_PROJECT_ID=your-firebase-project-id
+   ```
+5. Spin up the development server:
+   ```bash
+   uvicorn app.main:app --port 9999 --reload
+   ```
 
 ### 3. Frontend Setup
-Navigate into the frontend directory:
-```bash
-cd ../frontend
-```
+1. Navigate into the frontend directory:
+   ```bash
+   cd ../frontend
+   ```
+2. Install npm packages:
+   ```bash
+   npm install
+   ```
+3. Create a `.env.local` configuration file inside the `frontend/` directory:
+   ```env
+   # Backend Endpoint Location
+   NEXT_PUBLIC_BACKEND_URL=http://localhost:9999
 
-Install dependencies:
-```bash
-npm install
-```
-
-Create a `.env.local` file in the `frontend/` directory:
-```env
-# Backend API Location
-NEXT_PUBLIC_BACKEND_URL=http://localhost:9999
-
-# Firebase Client configuration (Leave blank/remove to use local Developer Mock Mode)
-NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSy...
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=000000000000
-NEXT_PUBLIC_FIREBASE_APP_ID=1:000000000000:web:000000000000
-```
-
-Start the Next.js development server:
-```bash
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+   # Firebase Credentials (Leave empty to use Mock Local Developer Mode)
+   NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSy...
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=000000000000
+   NEXT_PUBLIC_FIREBASE_APP_ID=1:000000000000:web:000000000000
+   ```
+4. Start the Turbopack dev server:
+   ```bash
+   npm run dev
+   ```
+5. Open your browser and view the app at [http://localhost:3000](http://localhost:3000).
 
 ---
 
 ## 🌐 Production Deployment Guide
 
-CodeRecall has been structured to make deployment on cloud providers easy.
+### 1. Frontend (Netlify)
+The frontend uses the pre-configured [netlify.toml](file:///netlify.toml) file to compile the static application output directory structure automatically:
+1. Connect your repository to **Netlify**.
+2. Netlify reads the base configuration:
+   * **Base Directory:** `frontend`
+   * **Build Command:** `npm run build`
+   * **Publish Directory:** `frontend/out`
+3. Configure the following environment variables in the Netlify site console:
+   * `NEXT_PUBLIC_BACKEND_URL`: The URL of your deployed FastAPI backend (e.g. `https://your-backend.onrender.com`).
+   * The client-side Firebase configurations (`NEXT_PUBLIC_FIREBASE_*`).
 
-### 1. Frontend Deployment (Netlify)
-The frontend uses the pre-configured [netlify.toml](file:///netlify.toml) file in the root directory to handle Next.js subdirectory builds.
-
-To deploy:
-1. Connect your GitHub repository to **Netlify**.
-2. Netlify will auto-detect the root `netlify.toml` and apply the settings:
-   - **Base directory:** `frontend`
-   - **Build command:** `npm run build`
-   - **Publish directory:** `.next`
-3. Add the following **Environment Variables** in the Netlify site console:
-   - `NEXT_PUBLIC_BACKEND_URL`: The URL where your backend API is deployed (e.g. `https://your-backend.koyeb.app`).
-   - All your frontend Firebase environment variables (`NEXT_PUBLIC_FIREBASE_*`).
-
----
-
-### 2. Backend Deployment (Hugging Face Spaces - Free Docker Host)
-Since the backend processes long-running AI operations and clones repositories in the background, serverless hosts (like Vercel or Netlify functions) will timeout or freeze. Instead, you can host it completely for free on **Hugging Face Spaces** using their Docker SDK (no credit card required).
-
-A pre-configured `Dockerfile` has been provided at the root of the project to support this.
-
-#### Deployment Steps:
-1. Sign up or log in to [Hugging Face](https://huggingface.co/).
-2. Create a new Space:
-   - **Space Name:** `coderecall-backend` (or any name you like)
-   - **License:** `mit`
-   - **SDK:** Select **Docker** (choose the **Blank** template).
-   - **Visibility:** Public (your code will be public, but your environment variables and database will remain completely secure).
-3. Connect your GitHub repository:
-   - You can link your GitHub repository to the Hugging Face Space for auto-deploys, or push manually to the HF Git remote.
-4. Go to the **Settings** tab in your Space dashboard:
-   - Scroll down to the **Variables and secrets** section.
-   - Add the following as **Secrets** (do not add them as regular Variables, as Secrets are hidden):
-     - `DATABASE_URL` (Supabase connection string)
-     - `GEMINI_API_KEY_MAP`
-     - `GEMINI_API_KEY_REDUCE`
-     - `GEMINI_API_KEY_RAG`
-     - `FIREBASE_PROJECT_ID`
-5. Hugging Face will automatically detect the root `Dockerfile`, build your container, and start the FastAPI server.
-6. Once the space status changes to **Running**, your backend endpoint will be available at:
-   `https://<your-username>-<your-space-name>.hf.space` (e.g. `https://aryankale14-coderecall-backend.hf.space`).
-7. Use this URL (with a trailing slash) as the `NEXT_PUBLIC_BACKEND_URL` environment variable when deploying your frontend on Netlify.
+### 2. Backend (Render / Docker Host)
+Because repository parsing and Map-Reduce AI operations are long-running background processes, serverless functions (like Netlify/Vercel functions) will timeout. Use standard Docker runtime container hosting:
+1. A production-ready `Dockerfile` is provided in the repository root.
+2. Link your repository to **Render** or another Docker host.
+3. Configure your environment variables as hidden secrets.
+4. Set the host to listen on port `8000`.
 
 ---
 
-## 🔒 Firebase Security & Domain Whitelisting
-
-If using production Firebase Auth:
-1. Go to your **Firebase Console** > **Authentication** > **Settings** > **Authorized Domains**.
-2. Click **Add Domain** and add your Netlify custom subdomain (e.g., `your-site.netlify.app`).
-3. For local mobile testing on the same Wi-Fi network, add your local laptop IP address (e.g., `10.165.121.76`).
+## 🔒 Security Configuration
+Ensure Firebase OAuth redirects function correctly by whitelisting domains:
+1. Go to **Firebase Console** > **Authentication** > **Settings** > **Authorized Domains**.
+2. Add your Netlify URL (e.g., `code-recall1.netlify.app`).
+3. Set your CORS headers on the FastAPI backend to block unauthorized client requests.
