@@ -36,4 +36,9 @@ class Settings(BaseSettings):
 # which saves performance and avoids re-reading the .env file repeatedly.
 @lru_cache()
 def get_settings():
-    return Settings()
+    settings = Settings()
+    # Clean all string values in settings to remove any accidental quotes or whitespace
+    for key, value in list(settings.__dict__.items()):
+        if isinstance(value, str):
+            setattr(settings, key, value.strip().strip("'\""))
+    return settings
