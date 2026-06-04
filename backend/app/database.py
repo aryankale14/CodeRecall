@@ -12,8 +12,18 @@ settings = get_settings()
 # This is the core interface that manages connections to our PostgreSQL/Supabase database.
 # Note: For Supabase, ensure the DATABASE_URL starts with "postgresql://" 
 # If it starts with "postgres://", SQLAlchemy might complain in newer versions.
+db_url = settings.DATABASE_URL
+if not db_url:
+    raise ValueError(
+        "DATABASE_URL environment variable is missing or empty! "
+        "Please set the DATABASE_URL environment variable in your environment settings (e.g., Render Environment Variables)."
+    )
+
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(
-    settings.DATABASE_URL, 
+    db_url, 
     # pool_pre_ping=True checks if the connection is alive before using it, 
     # preventing "MySQL server has gone away" style errors in Postgres.
     pool_pre_ping=True 
