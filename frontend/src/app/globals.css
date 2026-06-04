@@ -922,6 +922,14 @@ h2, h3, h4 {
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5) !important;
 }
 
+.live-terminal .live-terminal-msg {
+  color: #f3f4f6 !important;
+}
+
+.live-terminal .live-terminal-time {
+  color: #22d3ee !important;
+}
+
 .live-terminal::-webkit-scrollbar {
   width: 6px;
 }
@@ -2967,5 +2975,154 @@ h2, h3, h4 {
   .lp-hero-cta-primary, .lp-hero-cta-secondary {
     width: 100% !important;
     justify-content: center !important;
+}
+
+/* --- Mobile Responsive Layout Styles --- */
+@media (max-width: 768px) {
+  /* Prevent horizontal scroll of body */
+  html, body {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Make code pre blocks scrollable and text wrapping robust */
+  pre {
+    white-space: pre !important;
+    word-wrap: normal !important;
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    display: block !important;
+  }
+  
+  code {
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+  }
+
+  p, li, span, h1, h2, h3, h4, h5, h6 {
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+  }
+
+  /* Mobile Ingestion stats container grid columns constraint */
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  
+  /* Ensure the main panel does not overflow horizontally */
+  main {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .tab-content {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Position classes for sliding aside drawer on mobile */
+  .inset-y-0 {
+    top: 0 !important;
+    bottom: 0 !important;
+  }
+  
+  .left-0 {
+    left: 0 !important;
+  }
+  
+  .w-72 {
+    width: 288px !important;
+  }
+  
+  .transition-transform {
+    transition: transform 0.3s ease-in-out !important;
+  }
+  
+  .-translate-x-full {
+    transform: translateX(-100%) !important;
+  }
+  
+  .translate-x-0 {
+    transform: translateX(0) !important;
+  }
+
+  /* Fixed overlays and menus z-index */
+  .z-40 {
+    z-index: 40 !important;
+  }
+  
+  .z-50 {
+    z-index: 50 !important;
+  }
+
+  /* Mobile header positioning and height alignment */
+  .mobile-header {
+    display: flex !important;
+    position: sticky !important;
+    top: 0 !important;
+    width: 100% !important;
+    z-index: 30 !important;
+  }
+
+  .mobile-header + main {
+    padding-top: 16px !important;
+  }
+
+  /* Prevent background overlay layout issues */
+  .fixed.inset-0.bg-black\/60 {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 45 !important;
+  }
+
+  aside.fixed {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    height: 100vh !important;
+    z-index: 50 !important;
+  }
+
+  /* Allow inline code to wrap on mobile */
+  :not(pre) > code {
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Fix for clipped diagrams and code blocks on mobile */
+  .glass-panel, .prose, .tab-content, pre, code {
+    max-width: 100% !important;
+    min-width: 0 !important;
   }
 }
+
+/* Desktop medium viewport translates override */
+@media (min-width: 769px) {
+  .md\:relative {
+    position: relative !important;
+  }
+  .md\:w-80 {
+    width: 320px !important;
+  }
+  .md\:translate-x-0 {
+    transform: translateX(0) !important;
+  }
+  .md\:hidden {
+    display: none !important;
+  }
+}
+
+/* Medium screen min-width 640px for grid columns */
+@media (min-width: 640px) {
+  .sm\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+

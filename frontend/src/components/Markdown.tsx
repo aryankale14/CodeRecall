@@ -66,7 +66,7 @@ export default function Markdown({ content }: MarkdownProps) {
           const currentIndex = key++;
           
           elements.push(
-            <div key={`code-${currentIndex}`} className="relative group my-5 rounded-lg overflow-hidden border border-glass shadow-lg">
+            <div key={`code-${currentIndex}`} className="relative group my-5 rounded-lg overflow-hidden border border-glass shadow-lg w-full max-w-full">
               <div className="bg-[#12161f] border-b border-glass px-4 py-2 flex items-center justify-between text-xs text-secondary font-mono">
                 <span>{blockLang}</span>
                 <button
@@ -82,7 +82,7 @@ export default function Markdown({ content }: MarkdownProps) {
                   <span>{copiedIndex === currentIndex ? "Copied" : "Copy"}</span>
                 </button>
               </div>
-              <pre className="bg-[#080b11] p-4 overflow-x-auto text-[13px] font-mono text-gray-300 leading-relaxed max-h-[400px]">
+              <pre className="bg-[#080b11] p-4 overflow-x-auto text-[13px] font-mono text-gray-300 leading-relaxed max-h-[400px] w-full max-w-full block">
                 <code>{blockText}</code>
               </pre>
             </div>

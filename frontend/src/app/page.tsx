@@ -34,7 +34,8 @@ import {
   Layers,
   Bot,
   Sun,
-  Moon
+  Moon,
+  Menu
 } from "lucide-react";
 import type { User } from "firebase/auth";
 import { auth, signInWithGoogle, logoutUser, getIdToken, onAuthStateChanged } from "../config/firebase";
@@ -112,6 +113,11 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(true);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  
+  // Mobile layout menu & dropdown states
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showMobileUserDropdown, setShowMobileUserDropdown] = useState(false);
+  const mobileDropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Platform Analytics State
   const [analytics, setAnalytics] = useState<PlatformAnalytics | null>(null);
@@ -307,6 +313,9 @@ export default function Home() {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowUserDropdown(false);
+      }
+      if (mobileDropdownRef.current && !mobileDropdownRef.current.contains(event.target as Node)) {
+        setShowMobileUserDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -522,6 +531,7 @@ export default function Home() {
     setSelectedFile(null);
     setReport(null);
     setPipelineStatus(null);
+    setMobileMenuOpen(false);
 
     if (historyRepo.has_report) {
       fetchRepoReport(historyRepo.repo_url, user);
@@ -884,9 +894,21 @@ export default function Home() {
 
   // 3. Authenticated Workspace Dashboard
   return (
-    <div className="min-height-screen flex flex-col md:flex-row">
+    <div className="min-height-screen flex flex-col md:flex-row relative">
+      {/* Mobile Sidebar Overlay Backdrop */}
+      {mobileMenuOpen && (
+        <div 
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden animate-fade-in"
+        />
+      )}
+
       {/* -------------------- SIDEBAR HISTORICAL TRACKER -------------------- */}
-      <aside className="w-full md:w-80 bg-[#0c0d12] border-b md:border-b-0 md:border-r border-glass flex flex-col shrink-0">
+      <aside 
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#0c0d12] border-r border-glass flex flex-col transition-transform duration-300 ease-in-out md:relative md:w-80 md:translate-x-0 ${
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
         {/* Brand */}
         <div className="p-6 border-b border-glass flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -985,11 +1007,113 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* -------------------- MAIN WORKSPACE AREA -------------------- */}
-      <main className="flex-1 flex flex-col bg-deep overflow-hidden p-6 md:p-8 scrollbar relative">
-        {/* UNIFIED WORKSPACE TOPBAR */}
-        <header className="workspace-topbar">
-          <div className="topbar-welcome" />
+      {/* -------------------- MAIN WRAPPER FOR HEADER + WORKSPACE -------------------- */}
+      <div className="flex-1 flex flex-col min-height-screen overflow-hidden">
+        {/* MOBILE HEADER */}
+        <header className="mobile-header flex items-center justify-between px-4 py-2.5 bg-[#0c0d12]/95 border-b border-glass backdrop-blur-md md:hidden shrink-0 z-30">
+          <div className="flex items-center gap-2">
+            {/* Hamburger Button */}
+            <button 
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-1.5 rounded-lg border border-glass text-secondary hover:text-white transition-colors"
+              title="Open Repository History"
+            >
+              <Menu size={16} />
+            </button>
+
+            {/* Brand Logo & Name */}
+            <div className="flex items-center gap-2">
+              <div className="w-6.5 h-6.5 rounded bg-gradient-to-tr from-indigo-500 to-fuchsia-500 flex items-center justify-center text-white font-extrabold shadow-sm text-[11px] leading-none" style={{ width: "26px", height: "26px" }}>
+                Ω
+              </div>
+              <span className="font-heading font-extrabold text-[12px] text-white tracking-tight">
+                CODE<span className="text-violet-400">RECALL</span>
+              </span>
+            </div>
+
+            {/* Ingest/Plus Button */}
+            <button
+              onClick={() => {
+                stopStatusPolling();
+                setSelectedRepoUrl(null);
+                setReport(null);
+                setPipelineStatus(null);
+              }}
+              className="p-1 rounded-md border border-glass hover:bg-white/10 text-secondary hover:text-white transition-colors ml-0.5"
+              title="Ingest New Repo"
+            >
+              <PlusCircle size={15} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <button
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              className="p-1.5 rounded-lg border border-glass flex items-center justify-center text-secondary hover:text-white transition-colors"
+              title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+              style={{ width: "28px", height: "28px" }}
+            >
+              {theme === "light" ? <Moon size={13} /> : <Sun size={13} />}
+            </button>
+
+            {/* User Dropdown wrapper */}
+            <div className="relative" ref={mobileDropdownRef}>
+              <button
+                onClick={() => setShowMobileUserDropdown(!showMobileUserDropdown)}
+                className="user-avatar-btn flex items-center justify-center"
+                title="User Account"
+                style={{ width: "28px", height: "28px" }}
+              >
+                {user?.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName || "Google User"}
+                    className="user-avatar-img"
+                    referrerPolicy="no-referrer"
+                    style={{ width: "28px", height: "28px", borderRadius: "50%" }}
+                  />
+                ) : (
+                  <div className="user-avatar-fallback text-[10px]" style={{ width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%" }}>
+                    <UserIcon size={12} />
+                  </div>
+                )}
+              </button>
+
+              {showMobileUserDropdown && (
+                <div className="user-dropdown-menu animate-fade-in absolute right-0 mt-2 z-50">
+                  <div className="dropdown-user-info">
+                    <p className="user-name text-xs font-semibold">{user?.displayName || "CodeRecall User"}</p>
+                    <p className="user-email text-[10px] text-muted">{user?.email}</p>
+                  </div>
+                  <div className="dropdown-divider" />
+                  {(user?.email === ADMIN_EMAIL || user?.email === "developer@coderecall.local") && (
+                    <a href="/admin" className="admin-link-btn text-xs py-1.5 flex items-center gap-1.5">
+                      <BarChart3 size={12} />
+                      <span>Admin Dashboard</span>
+                    </a>
+                  )}
+                  <button 
+                    onClick={() => {
+                      setShowMobileUserDropdown(false);
+                      logoutUser();
+                    }} 
+                    className="logout-btn text-xs py-1.5 flex items-center gap-1.5 w-full text-left"
+                  >
+                    <LogOut size={12} />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* -------------------- MAIN WORKSPACE AREA -------------------- */}
+        <main className="flex-1 flex flex-col bg-deep overflow-hidden p-6 md:p-8 scrollbar relative">
+          {/* UNIFIED WORKSPACE TOPBAR */}
+          <header className="workspace-topbar hidden md:flex">
+            <div className="topbar-welcome" />
 
           <div className="flex items-center gap-3">
             <button
@@ -1150,7 +1274,7 @@ export default function Home() {
               </p>
 
               {/* Progress Stat circles/numbers */}
-              <div className="grid grid-cols-4 gap-4 p-4 rounded-lg bg-black/40 border border-glass mb-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4 p-3 md:p-4 rounded-lg bg-black/40 border border-glass mb-6">
                 <div>
                   <h4 className="text-lg font-bold text-white leading-tight">
                     {pipelineStatus.total_files}
@@ -1492,6 +1616,7 @@ export default function Home() {
           </div>
         )}
       </main>
+      </div>
 
       {/* -------------------- FILE DETAIL SLIDING SHEET -------------------- */}
       {selectedFile && (
