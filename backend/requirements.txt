@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pydantic-settings
+sqlalchemy
+pgvector
+psycopg2-binary
+gitpython
+tenacity
+google-generativeai
+langchain
+langchain-google-genai
+python-dotenv
+firebase-admin
+

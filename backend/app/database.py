@@ -1,0 +1,38 @@
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+from app.config import get_settings
+
+settings = get_settings()
+
+# ---------------------------------------------------------
+# DATABASE SETUP
+# ---------------------------------------------------------
+
+# Create the SQLAlchemy Engine. 
+# This is the core interface that manages connections to our PostgreSQL/Supabase database.
+# Note: For Supabase, ensure the DATABASE_URL starts with "postgresql://" 
+# If it starts with "postgres://", SQLAlchemy might complain in newer versions.
+engine = create_engine(
+    settings.DATABASE_URL, 
+    # pool_pre_ping=True checks if the connection is alive before using it, 
+    # preventing "MySQL server has gone away" style errors in Postgres.
+    pool_pre_ping=True 
+)
+
+# Create a SessionLocal class. 
+# Each instance of this class will be an active database session.
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Create a Base class for our models.
+# All our database tables will inherit from this Base class so SQLAlchemy knows about them.
+Base = declarative_base()
+
+# Dependency function to get a Database session for our FastAPI routes.
+# This pattern ensures a session is opened when a request comes in, 
+# and it is safely closed when the request is done, even if an error occurs.
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
