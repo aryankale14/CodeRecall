@@ -1,6 +1,6 @@
-# 🌌 AetherReview — AI-Powered Codebase Intelligence
+# 🌌 CodeRecall — AI-Powered Codebase Intelligence
 
-AetherReview is a premium, responsive repository analysis platform. It uses a custom Map-Reduce agentic workflow to clone, index, audit, and explain entire GitHub codebases. Users can view auto-generated global architecture reports, run comprehensive security audits, inspect file-by-file breakdowns, and chat directly with their codebase using a semantic RAG assistant.
+CodeRecall is a premium, responsive repository analysis platform. It uses a custom Map-Reduce agentic workflow to clone, index, audit, and explain entire GitHub codebases. Users can view auto-generated global architecture reports, run comprehensive security audits, inspect file-by-file breakdowns, and chat directly with their codebase using a semantic RAG assistant.
 
 ---
 
@@ -130,7 +130,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 ## 🌐 Production Deployment Guide
 
-AetherReview has been structured to make deployment on cloud providers easy.
+CodeRecall has been structured to make deployment on cloud providers easy.
 
 ### 1. Frontend Deployment (Netlify)
 The frontend uses the pre-configured [netlify.toml](file:///netlify.toml) file in the root directory to handle Next.js subdirectory builds.
@@ -155,7 +155,7 @@ A pre-configured `Dockerfile` has been provided at the root of the project to su
 #### Deployment Steps:
 1. Sign up or log in to [Hugging Face](https://huggingface.co/).
 2. Create a new Space:
-   - **Space Name:** `aether-backend` (or any name you like)
+   - **Space Name:** `coderecall-backend` (or any name you like)
    - **License:** `mit`
    - **SDK:** Select **Docker** (choose the **Blank** template).
    - **Visibility:** Public (your code will be public, but your environment variables and database will remain completely secure).
@@ -171,7 +171,7 @@ A pre-configured `Dockerfile` has been provided at the root of the project to su
      - `FIREBASE_PROJECT_ID`
 5. Hugging Face will automatically detect the root `Dockerfile`, build your container, and start the FastAPI server.
 6. Once the space status changes to **Running**, your backend endpoint will be available at:
-   `https://<your-username>-<your-space-name>.hf.space` (e.g. `https://aryankale14-aether-backend.hf.space`).
+   `https://<your-username>-<your-space-name>.hf.space` (e.g. `https://aryankale14-coderecall-backend.hf.space`).
 7. Use this URL (with a trailing slash) as the `NEXT_PUBLIC_BACKEND_URL` environment variable when deploying your frontend on Netlify.
 
 ---

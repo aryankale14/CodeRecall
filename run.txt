@@ -4,7 +4,7 @@ frontend: npm run dev
 
 
 2. Why the "Issues Found" Count is Higher than the "Security Audit" Report
-This behavior is actually an intentional, advanced feature of the Map-Reduce Architecture built into AetherReview. Here is exactly how it works under the hood:
+This behavior is actually an intentional, advanced feature of the Map-Reduce Architecture built into CodeRecall. Here is exactly how it works under the hood:
 
 The Raw File Scanning (Map Phase)
 During the initial Map phase, individual AI agents analyze every file independently. They are instructed to flag any potential issue, warning, or style concern.

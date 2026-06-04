@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AetherReview | AI Repository Intelligence Platform",
+  title: "CodeRecall | AI Repository Intelligence Platform",
   description: "High-performance, deep code reasoning repository analyzer, static vulnerability finder, and semantic architecture Q&A assistant powered by Gemini 3.5.",
   keywords: ["AI Code Review", "Static Analysis", "Code Vulnerabilities", "Gemini AI", "FastAPI RAG", "Repository Explorer"],
 };

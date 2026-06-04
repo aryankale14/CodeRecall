@@ -132,7 +132,7 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    if (user && (user.email === ADMIN_EMAIL || user.email === "developer@aetherreview.local")) {
+    if (user && (user.email === ADMIN_EMAIL || user.email === "developer@coderecall.local")) {
       fetchAdminAnalytics();
     }
   }, [user]);
@@ -169,7 +169,7 @@ export default function AdminPage() {
           <p className="admin-denied-desc">Please sign in from the main page to access the admin dashboard.</p>
           <a href="/" className="admin-back-link">
             <ArrowLeft size={16} />
-            <span>Back to AetherReview</span>
+            <span>Back to CodeRecall</span>
           </a>
         </div>
       </div>
@@ -177,7 +177,7 @@ export default function AdminPage() {
   }
 
   // Not admin
-  if (user.email !== ADMIN_EMAIL && user.email !== "developer@aetherreview.local") {
+  if (user.email !== ADMIN_EMAIL && user.email !== "developer@coderecall.local") {
     return (
       <div className="admin-denied">
         <div className="admin-denied-card">
@@ -189,7 +189,7 @@ export default function AdminPage() {
           </p>
           <a href="/" className="admin-back-link">
             <ArrowLeft size={16} />
-            <span>Back to AetherReview</span>
+            <span>Back to CodeRecall</span>
           </a>
         </div>
       </div>
@@ -204,7 +204,7 @@ export default function AdminPage() {
           <a href="/" className="admin-logo-link">
             <div className="admin-logo">Ω</div>
             <div>
-              <h1 className="admin-brand">AETHER<span className="admin-brand-accent">REVIEW</span></h1>
+              <h1 className="admin-brand">CODE<span className="admin-brand-accent">RECALL</span></h1>
               <p className="admin-brand-sub">Admin Analytics Console</p>
             </div>
           </a>
@@ -251,7 +251,7 @@ export default function AdminPage() {
             {showUserDropdown && (
               <div className="user-dropdown-menu animate-fade-in" style={{ right: 0, left: "auto" }}>
                 <div className="dropdown-user-info">
-                  <p className="user-name">{user?.displayName || "Aether User"}</p>
+                  <p className="user-name">{user?.displayName || "CodeRecall User"}</p>
                   <p className="user-email">{user?.email}</p>
                 </div>
                 <div className="dropdown-divider" />
@@ -396,7 +396,7 @@ export default function AdminPage() {
 
       {/* FOOTER */}
       <footer className="admin-footer">
-        <p>AetherReview Admin Console • Platform Analytics Dashboard</p>
+        <p>CodeRecall Admin Console • Platform Analytics Dashboard</p>
       </footer>
     </div>
   );

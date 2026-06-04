@@ -140,7 +140,7 @@ export function generatePdf(report: RepoReport): void {
     d.setFont("helvetica", "normal");
     d.setFontSize(8);
     d.setTextColor(100, 116, 139); // Slate-500
-    d.text("AETHERREVIEW — REPOSITORY ANALYSIS REPORT", marginX, 12);
+    d.text("CODERECALL — REPOSITORY ANALYSIS REPORT", marginX, 12);
     d.setDrawColor(226, 232, 240); // Slate-200
     d.setLineWidth(0.2);
     d.line(marginX, 14, pageWidth - marginX, 14);
@@ -334,11 +334,11 @@ export function generatePdf(report: RepoReport): void {
   doc.setFillColor(15, 23, 42); // Dark slate (Slate-900)
   doc.rect(0, 0, pageWidth, 60, "F");
 
-  // AetherReview Brand logo/text in top header
+  // CodeRecall Brand logo/text in top header
   doc.setFont("helvetica", "bold");
   doc.setFontSize(24);
   doc.setTextColor(255, 255, 255);
-  doc.text("AETHERREVIEW", marginX, 35);
+  doc.text("CODERECALL", marginX, 35);
   
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
@@ -404,7 +404,7 @@ export function generatePdf(report: RepoReport): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(148, 163, 184); // Slate-400
-  doc.text("This report was compiled by AetherReview AI Agents.", pageWidth / 2, pageHeight - 20, { align: "center" });
+  doc.text("This report was compiled by CodeRecall AI Agents.", pageWidth / 2, pageHeight - 20, { align: "center" });
 
   // ==========================================
   // PAGE 2: ARCHITECTURE OVERVIEW
@@ -561,7 +561,7 @@ export function generatePdf(report: RepoReport): void {
   doc.text("4. File Ingestion & Analysis Summary", marginX, y);
   y += 10;
 
-  y = addTextFlow("Below is the summary list of individual files successfully scanned and indexed by AetherReview, including language categorization and high-level descriptions.", y, 10, false, 6, { r: 71, g: 85, b: 105 });
+  y = addTextFlow("Below is the summary list of individual files successfully scanned and indexed by CodeRecall, including language categorization and high-level descriptions.", y, 10, false, 6, { r: 71, g: 85, b: 105 });
   y += 6;
 
   // Add the file listings

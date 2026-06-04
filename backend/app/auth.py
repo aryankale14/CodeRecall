@@ -59,7 +59,7 @@ def save_user_mapping(uid: str, email: str):
 
 def get_email_from_uid(uid: str) -> str:
     if uid == "mock_local_developer_uid":
-        return "developer@aetherreview.local"
+        return "developer@coderecall.local"
     try:
         if os.path.exists(USER_MAPPINGS_FILE):
             with open(USER_MAPPINGS_FILE, "r") as f:
@@ -159,7 +159,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         print("[MOCK AUTH] Verifying Bearer Token locally (Mock Mode active)...")
         return {
             "uid": "mock_local_developer_uid",
-            "email": "developer@aetherreview.local",
+            "email": "developer@coderecall.local",
             "name": "Local Developer"
         }
 
@@ -171,7 +171,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token.get("uid") or decoded_token.get("sub")
         email = decoded_token.get("email")
-        name = decoded_token.get("name", "AetherUser")
+        name = decoded_token.get("name", "CodeRecallUser")
         
         # Save mapping of UID -> Email
         if uid and email:
@@ -190,7 +190,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
             decoded_token = verify_token_manually(token, project_id)
             uid = decoded_token.get("uid") or decoded_token.get("sub")
             email = decoded_token.get("email")
-            name = decoded_token.get("name", "AetherUser")
+            name = decoded_token.get("name", "CodeRecallUser")
             
             # Save mapping of UID -> Email
             if uid and email:

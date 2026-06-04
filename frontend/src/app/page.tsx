@@ -620,7 +620,7 @@ export default function Home() {
           <div className="lp-nav-inner">
             <div className="lp-nav-brand">
               <div className="lp-nav-logo">Ω</div>
-              <span className="lp-nav-name">AETHER<span className="lp-nav-name-accent">REVIEW</span></span>
+              <span className="lp-nav-name">CODE<span className="lp-nav-name-accent">RECALL</span></span>
             </div>
             <div className="lp-nav-links">
               <a href="#features" className="lp-nav-link">Features</a>
@@ -659,7 +659,7 @@ export default function Home() {
             </h1>
 
             <p className="lp-hero-subtitle">
-              AetherReview is an AI-powered repository intelligence platform that deep-analyzes
+              CodeRecall is an AI-powered repository intelligence platform that deep-analyzes
               your codebase, detects vulnerabilities, generates architectural reports, and lets
               you query your code with natural language — all in real-time.
             </p>
@@ -858,7 +858,7 @@ export default function Home() {
           <div className="lp-cta-block">
 
             <h2 className="lp-cta-title">Ready to Elevate Your Code Reviews?</h2>
-            <p className="lp-cta-desc">Join engineers who trust AetherReview for AI-powered code intelligence.</p>
+            <p className="lp-cta-desc">Join engineers who trust CodeRecall for AI-powered code intelligence.</p>
             <button onClick={handleSignIn} className="lp-cta-btn">
               <svg className="google-icon" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.2-5.136 4.2A5.725 5.725 0 0 1 8.24 12.87a5.725 5.725 0 0 1 5.75-5.73c1.5 0 2.871.56 3.931 1.485l3.22-3.21C19.141 3.555 16.79 2.5 13.99 2.5C8.47 2.5 4 6.97 4 12.485s4.47 9.985 9.99 9.985c5.78 0 9.61-4.06 9.61-9.78c0-.66-.06-1.29-.17-1.89h-11.2v-.515z" />
@@ -874,9 +874,9 @@ export default function Home() {
           <div className="lp-footer-inner">
             <div className="lp-footer-brand">
               <div className="lp-nav-logo">Ω</div>
-              <span className="lp-nav-name">AETHER<span className="lp-nav-name-accent">REVIEW</span></span>
+              <span className="lp-nav-name">CODE<span className="lp-nav-name-accent">RECALL</span></span>
             </div>
-            <p className="lp-footer-text">© 2026 AetherReview. AI-Powered Repository Intelligence.</p>
+            <p className="lp-footer-text">© 2026 CodeRecall. AI-Powered Repository Intelligence.</p>
           </div>
         </footer>
       </div>
@@ -896,7 +896,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="font-heading font-extrabold text-md tracking-tight text-white leading-none">
-                AETHER<span className="text-violet-400">REVIEW</span>
+                CODE<span className="text-violet-400">RECALL</span>
               </h1>
             </div>
           </div>
@@ -982,7 +982,7 @@ export default function Home() {
 
         {/* Footer */}
         <div className="p-4 border-t border-glass bg-[#08090d] text-center">
-          <p className="text-[10px] text-muted">AetherReview v1.0.0</p>
+          <p className="text-[10px] text-muted">CodeRecall v1.0.0</p>
         </div>
       </aside>
 
@@ -1025,11 +1025,11 @@ export default function Home() {
             {showUserDropdown && (
               <div className="user-dropdown-menu animate-fade-in">
                 <div className="dropdown-user-info">
-                  <p className="user-name">{user?.displayName || "Aether User"}</p>
+                  <p className="user-name">{user?.displayName || "CodeRecall User"}</p>
                   <p className="user-email">{user?.email}</p>
                 </div>
                 <div className="dropdown-divider" />
-                {(user?.email === ADMIN_EMAIL || user?.email === "developer@aetherreview.local") && (
+                {(user?.email === ADMIN_EMAIL || user?.email === "developer@coderecall.local") && (
                   <a href="/admin" className="admin-link-btn">
                     <BarChart3 size={14} />
                     <span>Admin Dashboard</span>
