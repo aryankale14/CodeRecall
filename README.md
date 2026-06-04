@@ -147,23 +147,32 @@ To deploy:
 
 ---
 
-### 2. Backend Deployment (Koyeb)
-Since your backend runs long-running background tasks to fetch repositories and process Gemini analysis, it needs a continuous container/web hosting service. **Koyeb** offers a free tier (512MB RAM, no credit card required) that is perfect for this.
+### 2. Backend Deployment (Hugging Face Spaces - Free Docker Host)
+Since the backend processes long-running AI operations and clones repositories in the background, serverless hosts (like Vercel or Netlify functions) will timeout or freeze. Instead, you can host it completely for free on **Hugging Face Spaces** using their Docker SDK (no credit card required).
+
+A pre-configured `Dockerfile` has been provided at the root of the project to support this.
 
 #### Deployment Steps:
-1. Sign up on [Koyeb](https://www.koyeb.com).
-2. Create a new service and connect it to your GitHub repository.
-3. Configure the build parameters in the Koyeb UI:
-   - **Work Directory:** `backend`
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Run Command:** `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`
-4. Set the required **Environment Variables** in the service dashboard:
-   - `DATABASE_URL` (Supabase Postgres URI)
-   - `GEMINI_API_KEY_MAP`
-   - `GEMINI_API_KEY_REDUCE`
-   - `GEMINI_API_KEY_RAG`
-   - `FIREBASE_PROJECT_ID`
-5. Deploy. Koyeb will build the app and give you a public URL (e.g., `https://your-app.koyeb.app`). Use this URL as your `NEXT_PUBLIC_BACKEND_URL` variable in Netlify.
+1. Sign up or log in to [Hugging Face](https://huggingface.co/).
+2. Create a new Space:
+   - **Space Name:** `aether-backend` (or any name you like)
+   - **License:** `mit`
+   - **SDK:** Select **Docker** (choose the **Blank** template).
+   - **Visibility:** Public (your code will be public, but your environment variables and database will remain completely secure).
+3. Connect your GitHub repository:
+   - You can link your GitHub repository to the Hugging Face Space for auto-deploys, or push manually to the HF Git remote.
+4. Go to the **Settings** tab in your Space dashboard:
+   - Scroll down to the **Variables and secrets** section.
+   - Add the following as **Secrets** (do not add them as regular Variables, as Secrets are hidden):
+     - `DATABASE_URL` (Supabase connection string)
+     - `GEMINI_API_KEY_MAP`
+     - `GEMINI_API_KEY_REDUCE`
+     - `GEMINI_API_KEY_RAG`
+     - `FIREBASE_PROJECT_ID`
+5. Hugging Face will automatically detect the root `Dockerfile`, build your container, and start the FastAPI server.
+6. Once the space status changes to **Running**, your backend endpoint will be available at:
+   `https://<your-username>-<your-space-name>.hf.space` (e.g. `https://aryankale14-aether-backend.hf.space`).
+7. Use this URL (with a trailing slash) as the `NEXT_PUBLIC_BACKEND_URL` environment variable when deploying your frontend on Netlify.
 
 ---
 
