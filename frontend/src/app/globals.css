@@ -3058,7 +3058,7 @@ h2, h3, h4 {
   }
 
   /* Mobile header positioning and height alignment */
-  .mobile-header {
+  header.mobile-header {
     display: flex !important;
     position: sticky !important;
     top: 0 !important;
@@ -3068,16 +3068,16 @@ h2, h3, h4 {
     border-bottom: 1px solid var(--border-glass) !important;
   }
 
-  .dark .mobile-header {
+  .dark header.mobile-header {
     background-color: #0c0d12 !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
 
-  .workspace-topbar {
+  header.workspace-topbar {
     display: none !important;
   }
 
-  .mobile-header + main {
+  header.mobile-header + main {
     padding-top: 16px !important;
   }
 
@@ -3091,7 +3091,7 @@ h2, h3, h4 {
     z-index: 45 !important;
   }
 
-  aside {
+  aside.fixed {
     position: fixed !important;
     top: 0 !important;
     bottom: 0 !important;
@@ -3116,15 +3116,15 @@ h2, h3, h4 {
 
 /* Desktop medium viewport overrides */
 @media (min-width: 768px) {
-  .mobile-header {
+  header.mobile-header {
     display: none !important;
   }
   
-  .workspace-topbar {
+  header.workspace-topbar {
     display: flex !important;
   }
 
-  aside {
+  aside.fixed {
     position: relative !important;
     transform: translateX(0) !important;
     width: 320px !important;
