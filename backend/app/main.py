@@ -1,3 +1,7 @@
+import warnings
+# Suppress deprecation and future warnings in production logs
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
