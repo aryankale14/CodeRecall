@@ -1,4 +1,5 @@
 import google.generativeai as genai
+import google.generativeai.client as genai_client
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from sqlalchemy.orm import Session
 
@@ -60,7 +61,7 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
     # Force the local client configuration to use the correct API key atomically
     genai.configure(api_key=settings.GEMINI_API_KEY_RAG)
     model = genai.GenerativeModel("gemini-2.5-flash")
-    model._client = genai.client.get_default_generative_client()
+    model._client = genai_client.get_default_generative_client()
     
     prompt = f"""
     You are an expert AI Code Assistant. Answer the user's question about their codebase using ONLY the provided code context below.

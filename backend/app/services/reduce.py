@@ -3,6 +3,7 @@ import asyncio
 from sqlalchemy.orm import Session
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 import google.generativeai as genai
+import google.generativeai.client as genai_client
 from google.api_core.exceptions import GoogleAPICallError, InvalidArgument, PermissionDenied, NotFound
 
 from app.config import get_settings
@@ -35,8 +36,7 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
     ).all()
 
     if not files:
-        print(f"No completed files found for {repo_url} to reduce.")
-        return
+        raise ValueError("No completed files were successfully processed by the AI Map phase. Cannot synthesize global report.")
 
     add_pipeline_log(repo_url, f"Reduce: synthesizing {len(files)} file summaries into global report...")
 
@@ -76,7 +76,7 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
     # Force the local client configuration to use the correct API key atomically
     genai.configure(api_key=settings.GEMINI_API_KEY_REDUCE)
     model = genai.GenerativeModel("gemini-3.5-flash")
-    model._client = genai.client.get_default_generative_client()
+    model._client = genai_client.get_default_generative_client()
 
     @retry(
         retry=retry_if_exception(is_transient_error),

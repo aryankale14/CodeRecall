@@ -1266,9 +1266,15 @@ export default function Home() {
               <div className="absolute -top-12 -left-12 w-24 h-24 bg-violet-500/20 blur-3xl rounded-full" />
               <div className="absolute -bottom-12 -right-12 w-24 h-24 bg-cyan-500/20 blur-3xl rounded-full" />
 
-              <RefreshCw size={36} className="text-cyan-400 animate-spin mx-auto mb-6" />
+              {pipelineStatus.status === "error" ? (
+                <XCircle size={36} className="text-rose-500 mx-auto mb-6" />
+              ) : (
+                <RefreshCw size={36} className="text-cyan-400 animate-spin mx-auto mb-6" />
+              )}
               
-              <h3 className="text-xl font-bold text-white font-heading mb-1">AI Map-Reduce Engine Running</h3>
+              <h3 className="text-xl font-bold text-white font-heading mb-1">
+                {pipelineStatus.status === "error" ? "Repository Analysis Failed" : "AI Map-Reduce Engine Running"}
+              </h3>
               <p className="text-secondary text-xs truncate max-w-sm mx-auto font-mono mb-6" title={pipelineStatus.repo_url}>
                 {pipelineStatus.repo_url}
               </p>
@@ -1329,7 +1335,11 @@ export default function Home() {
               {/* LIVE TERMINAL LOG PANEL */}
               <div className="mt-6 text-left">
                 <div className="text-[10px] text-muted uppercase font-bold tracking-wider mb-2 flex items-center gap-1.5 px-1">
-                  <RefreshCw size={10} className="animate-spin text-cyan-400" />
+                  {pipelineStatus.status === "error" ? (
+                    <XCircle size={10} className="text-rose-500" />
+                  ) : (
+                    <RefreshCw size={10} className="animate-spin text-cyan-400" />
+                  )}
                   <span>Live Pipeline Logs</span>
                 </div>
                 <div className="live-terminal">
@@ -1347,9 +1357,15 @@ export default function Home() {
                 </div>
               </div>
 
-              <p className="text-[10px] text-muted mt-6 max-w-xs mx-auto leading-normal">
-                Phase 1 is synchronous. Phases 2 (Vector Map Summarization) and 3 (Global Architecture Reduce) run concurrently in background threads. Your interface will auto-load when done.
-              </p>
+              {pipelineStatus.status === "error" ? (
+                <p className="text-[11px] text-rose-400 mt-6 max-w-xs mx-auto leading-normal font-semibold">
+                  Critical pipeline failure. Review the errors logged in the terminal above. Click "Reset Ingestion State" to clear this screen and try again.
+                </p>
+              ) : (
+                <p className="text-[10px] text-muted mt-6 max-w-xs mx-auto leading-normal">
+                  Phase 1 is synchronous. Phases 2 (Vector Map Summarization) and 3 (Global Architecture Reduce) run concurrently in background threads. Your interface will auto-load when done.
+                </p>
+              )}
 
               <button
                 onClick={handleStopIngestion}
@@ -1360,6 +1376,11 @@ export default function Home() {
                   <>
                     <RefreshCw size={14} className="animate-spin" />
                     <span>Stopping Ingestion...</span>
+                  </>
+                ) : pipelineStatus.status === "error" ? (
+                  <>
+                    <XCircle size={14} />
+                    <span>Reset Ingestion State</span>
                   </>
                 ) : (
                   <>

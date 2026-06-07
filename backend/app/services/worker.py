@@ -2,6 +2,7 @@ import json
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 import google.generativeai as genai
+import google.generativeai.client as genai_client
 from google.api_core.exceptions import GoogleAPICallError, InvalidArgument, PermissionDenied, NotFound
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -94,7 +95,7 @@ async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, l
     # Force the local client configuration to use the correct API key atomically
     genai.configure(api_key=settings.GEMINI_API_KEY_MAP)
     model = genai.GenerativeModel("gemini-3.1-flash-lite")
-    model._client = genai.client.get_default_generative_client()
+    model._client = genai_client.get_default_generative_client()
     
     prompt = f"""
     You are an expert Code Reviewer and Security Auditor.

@@ -4,6 +4,7 @@ import asyncio
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException
+from google.api_core.exceptions import GoogleAPICallError, ResourceExhausted, PermissionDenied
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -48,6 +49,43 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------
+# GEMINI API KEY VERIFICATION PRE-CHECKS
+# ---------------------------------------------------------
+async def verify_gemini_key(api_key: str) -> str | None:
+    """
+    Verify if a Gemini API key is valid and has remaining quota.
+    Returns an error message string if invalid/exhausted, or None if valid.
+    """
+    if not api_key:
+        return "API Key is missing."
+    try:
+        import google.generativeai as genai
+        import google.generativeai.client as genai_client
+        # Configure the key atomically
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        model._client = genai_client.get_default_generative_client()
+        # Make a tiny lightweight call
+        await model.generate_content_async(
+            "Ping",
+            generation_config=genai.GenerationConfig(max_output_tokens=1)
+        )
+        return None
+    except ResourceExhausted as e:
+        return "API Key has exhausted its quota or prepayment balance (429 ResourceExhausted)."
+    except PermissionDenied as e:
+        return "API Key is invalid or lacks permissions (403 PermissionDenied)."
+    except GoogleAPICallError as e:
+        if e.code == 429:
+            return "API Key has exhausted its quota or prepayment balance (429 ResourceExhausted)."
+        if e.code == 403:
+            return "API Key is invalid or lacks permissions (403 PermissionDenied)."
+        return f"API Call failed: {e.message}"
+    except Exception as e:
+        # Ignore transient network validation errors to avoid blocking startup if offline
+        return f"Validation error: {str(e)}"
+
+# ---------------------------------------------------------
 # Pydantic Schemas for Request Validation
 # ---------------------------------------------------------
 class RepoRequest(BaseModel):
@@ -83,6 +121,21 @@ async def ingest_repo(
     repo_url = request.repo_url
     user_id = current_user["uid"]
     
+    # Pre-verify all three API keys to prevent starting a doomed ingestion
+    settings = get_settings()
+    
+    map_err = await verify_gemini_key(settings.GEMINI_API_KEY_MAP)
+    if map_err:
+        return {"status": "error", "message": f"Gemini Map Key error: {map_err}"}
+        
+    reduce_err = await verify_gemini_key(settings.GEMINI_API_KEY_REDUCE)
+    if reduce_err:
+        return {"status": "error", "message": f"Gemini Reduce Key error: {reduce_err}"}
+        
+    rag_err = await verify_gemini_key(settings.GEMINI_API_KEY_RAG)
+    if rag_err:
+        return {"status": "error", "message": f"Gemini RAG Key error: {rag_err}"}
+    
     # 1. Phase 1: Ingestion & Static Analysis (Run in a thread pool to avoid blocking the event loop)
     # This clones the repo, filters files, and saves pending files to DB.
     clear_pipeline_logs(repo_url)
@@ -110,6 +163,8 @@ async def ingest_repo(
             add_pipeline_log(repo_url, "Phase 3: Reduce — synthesizing global architecture report...")
             await generate_global_report(repo_url, bg_db, user_id)
             add_pipeline_log(repo_url, "Phase 3: Reduce complete — global report generated!")
+        except Exception as e:
+            add_pipeline_log(repo_url, f"Phase 3: Reduce failed — {str(e)}")
         finally:
             bg_db.close()
 
@@ -269,14 +324,24 @@ def repo_status(repo_url: str, db: Session = Depends(get_db), current_user: dict
         RepositoryFile.file_path != "__GLOBAL_REPORT__"
     ).count()
 
+    # Check if the Reduce phase is currently active in the background
+    logs = get_pipeline_logs(repo_url)
+    reduce_started = any("Phase 3: Reduce — synthesizing" in log["message"] for log in logs)
+    reduce_finished = any("Phase 3: Reduce complete" in log["message"] or "Phase 3: Reduce failed" in log["message"] for log in logs)
+    reduce_active = reduce_started and not reduce_finished
+
     if has_report:
         status = "completed"
+    elif reduce_active:
+        status = "processing"
     elif processing_count > 0:
         status = "processing"
     elif pending_count > 0:
         status = "pending"
     else:
-        status = "completed" if completed_count > 0 else "unknown"
+        # No files are pending, processing, or reducing, and there is no report.
+        # This means the pipeline has finished but failed to generate a report.
+        status = "error"
 
     return {
         "repo_url": repo_url,
