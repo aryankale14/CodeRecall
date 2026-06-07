@@ -63,7 +63,7 @@ async def verify_gemini_key(api_key: str) -> str | None:
         import google.generativeai.client as genai_client
         # Configure the key atomically
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         model._client = genai_client.get_default_generative_client()
         # Make a tiny lightweight call
         await model.generate_content_async(
