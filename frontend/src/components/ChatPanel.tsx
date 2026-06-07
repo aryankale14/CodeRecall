@@ -24,7 +24,7 @@ const PRESETS = [
   "Analyze the dependency layout and suggest architectural upgrades."
 ];
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:9999";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://coderecall.onrender.com";
 
 export default function ChatPanel({ repoUrl, user }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([

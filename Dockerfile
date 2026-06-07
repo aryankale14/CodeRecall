@@ -16,5 +16,5 @@ COPY backend/ .
 # Expose port 7860 (Hugging Face Spaces default container port)
 EXPOSE 7860
 
-# Run FastAPI using uvicorn
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Run FastAPI using uvicorn (binds to $PORT on Render, defaults to 7860 on Hugging Face Spaces)
+CMD ["sh", "-c", "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}"]

@@ -35,7 +35,7 @@ interface AdminAnalytics {
   users: AdminUser[];
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:9999";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://coderecall.onrender.com";
 const ADMIN_EMAIL = "aryankale1410@gmail.com";
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
