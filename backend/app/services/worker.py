@@ -22,7 +22,7 @@ genai.configure(api_key=settings.GEMINI_API_KEY_MAP)
 # RAG Key for Embeddings (Task A)
 # We initialize the LangChain embedding model here. 
 embeddings_model = GoogleGenerativeAIEmbeddings(
-    model="models/text-embedding-004", 
+    model="models/gemini-embedding-2", 
     google_api_key=settings.GEMINI_API_KEY_RAG
 )
 
@@ -70,7 +70,7 @@ async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, l
     Task B: Uses the Worker LLM (Key 1) to generate a strict JSON summary and vulnerability list.
     """
     # We use Gemini 1.5 Pro. It has a massive context window so we pass the whole file.
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-3.1-flash-lite")
     
     prompt = f"""
     You are an expert Code Reviewer and Security Auditor.

@@ -61,7 +61,7 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
     # 3. Fire off the Master Explainer and Master Security Agent in parallel
     # We use Gemini 1.5 Pro because it handles up to 2 Million tokens, 
     # perfect for reading thousands of summaries at once!
-    model = genai.GenerativeModel("gemini-1.5-pro")
+    model = genai.GenerativeModel("gemini-3.5-flash")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def run_master_explainer():
