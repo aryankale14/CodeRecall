@@ -57,8 +57,10 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
     context_text = "\n".join(context_blocks)
 
     # 4. Generate Answer using the Gemini Chat Model
-    # We use Flash here because it is significantly faster for interactive chat
+    # Force the local client configuration to use the correct API key atomically
+    genai.configure(api_key=settings.GEMINI_API_KEY_RAG)
     model = genai.GenerativeModel("gemini-2.5-flash")
+    model._client = genai.client.get_default_generative_client()
     
     prompt = f"""
     You are an expert AI Code Assistant. Answer the user's question about their codebase using ONLY the provided code context below.

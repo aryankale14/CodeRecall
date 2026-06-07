@@ -1,7 +1,8 @@
 import json
 import asyncio
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 import google.generativeai as genai
+from google.api_core.exceptions import GoogleAPICallError, InvalidArgument, PermissionDenied, NotFound
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -31,10 +32,26 @@ embeddings_model = GoogleGenerativeAIEmbeddings(
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
 
 # ---------------------------------------------------------
-# THE WORKER FUNCTIONS
+# THE WORKER FUNCTIONS & RETRY HELPERS
 # ---------------------------------------------------------
 
-@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10))
+def is_transient_error(exception):
+    # Do not retry if it's InvalidArgument (400), PermissionDenied (403), or NotFound (404)
+    if isinstance(exception, (InvalidArgument, PermissionDenied, NotFound)):
+        return False
+    # Only retry on 429, 500, 503, 504 or network/timeout issues
+    if isinstance(exception, GoogleAPICallError):
+        return exception.code in (429, 500, 503, 504)
+    if isinstance(exception, (asyncio.TimeoutError, ConnectionError, IOError)):
+        return True
+    return False
+
+@retry(
+    retry=retry_if_exception(is_transient_error),
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True
+)
 async def task_a_generate_embedding(content: str) -> list[float]:
     """
     Task A: Generates the vector embedding for the file using Key 3.
@@ -64,13 +81,20 @@ async def task_a_generate_embedding(content: str) -> list[float]:
     ]
     return mean_vector
 
-@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10))
+@retry(
+    retry=retry_if_exception(is_transient_error),
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True
+)
 async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, list]:
     """
     Task B: Uses the Worker LLM (Key 1) to generate a strict JSON summary and vulnerability list.
     """
-    # We use Gemini 1.5 Pro. It has a massive context window so we pass the whole file.
+    # Force the local client configuration to use the correct API key atomically
+    genai.configure(api_key=settings.GEMINI_API_KEY_MAP)
     model = genai.GenerativeModel("gemini-3.1-flash-lite")
+    model._client = genai.client.get_default_generative_client()
     
     prompt = f"""
     You are an expert Code Reviewer and Security Auditor.

@@ -1,10 +1,16 @@
 import os
 import tempfile
 import git
+import uuid
 from sqlalchemy.orm import Session
 from app.models import RepositoryFile
 from app.services.sanitizer import FileSanitizer
 from app.pipeline_logs import add_pipeline_log
+
+# Disable Git interactive credential prompting and ssh warning hangs
+os.environ["GIT_TERMINAL_PROMPT"] = "0"
+os.environ["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes"
+
 
 # A very simple map to guess the language based on extension (Static Analysis)
 LANGUAGE_MAP = {
@@ -74,8 +80,10 @@ def ingest_repository(repo_url: str, db: Session, user_id: str = "mock_local_dev
                 file_size = os.path.getsize(absolute_path)
                 language = guess_language(relative_path)
                 
-                # Prepare a new database record
+                # Prepare a new database record using a Python-generated UUID
+                file_uuid = uuid.uuid4()
                 db_record = RepositoryFile(
+                    id=file_uuid,
                     repo_url=repo_url,
                     file_path=relative_path,
                     language=language,
@@ -106,10 +114,9 @@ def ingest_repository(repo_url: str, db: Session, user_id: str = "mock_local_dev
 
                 # Add the record to the database session
                 db.add(db_record)
-                db.flush() # Flush to get the UUID generated immediately
                 
                 if db_record.status == "pending":
-                    pending_file_ids.append(str(db_record.id))
+                    pending_file_ids.append(str(file_uuid))
 
         # Commit all the inserted files to the database
         db.commit()

@@ -1,8 +1,9 @@
 import json
 import asyncio
 from sqlalchemy.orm import Session
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 import google.generativeai as genai
+from google.api_core.exceptions import GoogleAPICallError, InvalidArgument, PermissionDenied, NotFound
 
 from app.config import get_settings
 from app.models import RepositoryFile
@@ -58,12 +59,31 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
     all_summaries_text = "\n".join(compiled_summaries)
     all_vulns_text = json.dumps(compiled_vulnerabilities, indent=2)
 
+    def is_transient_error(exception):
+        # Do not retry if it's InvalidArgument (400), PermissionDenied (403), or NotFound (404)
+        if isinstance(exception, (InvalidArgument, PermissionDenied, NotFound)):
+            return False
+        # Only retry on 429, 500, 503, 504 or network/timeout issues
+        if isinstance(exception, GoogleAPICallError):
+            return exception.code in (429, 500, 503, 504)
+        if isinstance(exception, (asyncio.TimeoutError, ConnectionError, IOError)):
+            return True
+        return False
+
     # 3. Fire off the Master Explainer and Master Security Agent in parallel
     # We use Gemini 1.5 Pro because it handles up to 2 Million tokens, 
     # perfect for reading thousands of summaries at once!
+    # Force the local client configuration to use the correct API key atomically
+    genai.configure(api_key=settings.GEMINI_API_KEY_REDUCE)
     model = genai.GenerativeModel("gemini-3.5-flash")
+    model._client = genai.client.get_default_generative_client()
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    @retry(
+        retry=retry_if_exception(is_transient_error),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        reraise=True
+    )
     async def run_master_explainer():
         prompt = f"""
         You are the Master Architect. Below are the summaries of every file in a repository.
@@ -76,7 +96,12 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
         response = await model.generate_content_async(prompt)
         return response.text
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    @retry(
+        retry=retry_if_exception(is_transient_error),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        reraise=True
+    )
     async def run_master_security():
         if not compiled_vulnerabilities:
             return "## Executive Summary\n\nNo security vulnerabilities were detected by the automated analysis agents. The codebase appears to follow secure coding practices within the scope of this scan.\n\n## Recommendations\n\n- Continue following secure coding best practices\n- Implement regular dependency audits\n- Consider adding automated security scanning to your CI/CD pipeline"

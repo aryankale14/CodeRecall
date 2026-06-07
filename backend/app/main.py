@@ -1,4 +1,5 @@
 import warnings
+import asyncio
 # Suppress deprecation and future warnings in production logs
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -82,14 +83,15 @@ async def ingest_repo(
     repo_url = request.repo_url
     user_id = current_user["uid"]
     
-    # 1. Phase 1: Ingestion & Static Analysis (Synchronous)
+    # 1. Phase 1: Ingestion & Static Analysis (Run in a thread pool to avoid blocking the event loop)
     # This clones the repo, filters files, and saves pending files to DB.
     clear_pipeline_logs(repo_url)
     add_pipeline_log(repo_url, "Phase 1: Ingestion started — cloning repository...")
     try:
-        pending_file_ids = ingest_repository(repo_url, db, user_id)
+        pending_file_ids = await asyncio.to_thread(ingest_repository, repo_url, db, user_id)
         add_pipeline_log(repo_url, f"Phase 1 complete — {len(pending_file_ids)} files ready for AI analysis")
     except Exception as e:
+        add_pipeline_log(repo_url, f"Phase 1 failed: {str(e)}")
         return {"status": "error", "message": str(e)}
 
     # 2. Define the background wrapper to chain Map and Reduce phases
