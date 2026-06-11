@@ -51,3 +51,16 @@ class RepositoryFile(Base):
     # The owner UID of the user who scanned this repository (Firebase UID)
     user_id = Column(String, default="mock_local_developer_uid", index=True)
 
+
+class UserMapping(Base):
+    """
+    Persistent mapping of Firebase UIDs to user emails, stored in PostgreSQL.
+    This ensures email resolution remains persistent across deployments,
+    restarts, and container replacements.
+    """
+    __tablename__ = "user_mappings"
+
+    uid = Column(String, primary_key=True, index=True)
+    email = Column(String, nullable=False)
+
+

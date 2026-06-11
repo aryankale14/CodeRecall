@@ -33,6 +33,35 @@ try:
 except Exception as e:
     print(f"[WARNING] Database column alteration failed: {e}. If the column already exists, this is fine.")
 
+# Migrate local JSON user mappings to the database if the file exists
+try:
+    import os
+    import json
+    from app.database import SessionLocal
+    from app.models import UserMapping
+    
+    json_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "user_mappings.json")
+    if os.path.exists(json_path):
+        with open(json_path, "r") as f:
+            mappings = json.load(f)
+        if mappings:
+            db = SessionLocal()
+            try:
+                for uid, email in mappings.items():
+                    existing = db.query(UserMapping).filter(UserMapping.uid == uid).first()
+                    if not existing:
+                        db.add(UserMapping(uid=uid, email=email))
+                db.commit()
+                print(f"[INFO] Successfully migrated {len(mappings)} user mappings from JSON to database.")
+            except Exception as ex:
+                print(f"[WARNING] Failed to migrate user mappings: {ex}")
+                db.rollback()
+            finally:
+                db.close()
+except Exception as e:
+    print(f"[WARNING] User mappings migration check failed: {e}")
+
+
 app = FastAPI(
     title="Code Reviewer API",
     description="AI-Powered Repository Intelligence Tool",

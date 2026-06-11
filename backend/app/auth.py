@@ -42,34 +42,41 @@ except Exception as e:
 
 security_scheme = HTTPBearer(auto_error=False)
 
-# File to store persistent mapping of uid -> email to avoid calling Admin SDK when it's unconfigured
-USER_MAPPINGS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "user_mappings.json")
+from app.database import SessionLocal
+from app.models import UserMapping
 
 def save_user_mapping(uid: str, email: str):
     if not uid or not email:
         return
+    db = SessionLocal()
     try:
-        mappings = {}
-        if os.path.exists(USER_MAPPINGS_FILE):
-            with open(USER_MAPPINGS_FILE, "r") as f:
-                mappings = json.load(f)
-        if mappings.get(uid) != email:
-            mappings[uid] = email
-            with open(USER_MAPPINGS_FILE, "w") as f:
-                json.dump(mappings, f, indent=2)
+        # Check if mapping already exists in database
+        mapping = db.query(UserMapping).filter(UserMapping.uid == uid).first()
+        if not mapping:
+            mapping = UserMapping(uid=uid, email=email)
+            db.add(mapping)
+            db.commit()
+        elif mapping.email != email:
+            mapping.email = email
+            db.commit()
     except Exception as e:
-        print(f"[WARNING] Failed to save user mapping: {e}")
+        print(f"[WARNING] Failed to save user mapping to DB: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 def get_email_from_uid(uid: str) -> str:
     if uid == "mock_local_developer_uid":
         return "developer@coderecall.local"
+    db = SessionLocal()
     try:
-        if os.path.exists(USER_MAPPINGS_FILE):
-            with open(USER_MAPPINGS_FILE, "r") as f:
-                mappings = json.load(f)
-                return mappings.get(uid) or uid
-    except Exception:
-        pass
+        mapping = db.query(UserMapping).filter(UserMapping.uid == uid).first()
+        if mapping:
+            return mapping.email
+    except Exception as e:
+        print(f"[WARNING] Failed to fetch user mapping from DB: {e}")
+    finally:
+        db.close()
     return uid
 
 # A simple in-memory cache for public keys
