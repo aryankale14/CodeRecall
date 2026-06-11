@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     # This key needs to be fast and responsive for user chats.
     GEMINI_API_KEY_RAG: str = ""
 
+    # ---------------------------------------------------------
+    # MODEL CONFIGURATIONS - Defaulting to latest GA models
+    # ---------------------------------------------------------
+    GEMINI_MODEL_MAP: str = "gemini-3.1-flash-lite"
+    GEMINI_MODEL_REDUCE: str = "gemini-3.5-flash"
+    GEMINI_MODEL_RAG: str = "gemini-2.5-flash"
+
     # The Firebase Project ID, used to verify authentications
     FIREBASE_PROJECT_ID: str = "code-reviewer-9019f"
 

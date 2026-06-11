@@ -45,6 +45,12 @@ import ChatPanel from "../components/ChatPanel";
 import { generatePdf } from "../components/PdfExport";
 
 // Definitions
+interface RepositoryFileStatus {
+  file_path: string;
+  status: "pending" | "processing" | "completed" | "error" | "skipped";
+  error?: string;
+}
+
 interface Repository {
   repo_url: string;
   total_files: number;
@@ -54,6 +60,7 @@ interface Repository {
   error_files: number;
   status: "pending" | "processing" | "completed" | "error" | "unknown";
   has_report: boolean;
+  files?: RepositoryFileStatus[];
 }
 
 interface FileSummary {
@@ -184,7 +191,7 @@ export default function Home() {
 
   // Live Pipeline Progress Logs & Auto-scroll Ref
   const [pipelineLogs, setPipelineLogs] = useState<{ time: string; message: string }[]>([]);
-  const terminalEndRef = useRef<HTMLDivElement | null>(null);
+  const terminalRef = useRef<HTMLDivElement | null>(null);
 
   // Repository Deletion Overlay States
   const [deleteConfirmRepo, setDeleteConfirmRepo] = useState<string | null>(null);
@@ -412,10 +419,10 @@ export default function Home() {
     return () => stopStatusPolling();
   }, []);
 
-  // Auto-scroll pipeline terminal
+  // Auto-scroll pipeline terminal (non-disruptive for mobile viewports)
   useEffect(() => {
-    if (terminalEndRef.current) {
-      terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [pipelineLogs]);
 
@@ -1342,7 +1349,7 @@ export default function Home() {
                   )}
                   <span>Live Pipeline Logs</span>
                 </div>
-                <div className="live-terminal">
+                <div ref={terminalRef} className="live-terminal">
                   {pipelineLogs.length === 0 ? (
                     <div className="text-muted italic text-[11px]">Connecting to streaming server...</div>
                   ) : (
@@ -1353,9 +1360,32 @@ export default function Home() {
                       </div>
                     ))
                   )}
-                  <div ref={terminalEndRef} />
                 </div>
               </div>
+
+              {/* INDIVIDUAL FAILED FILES DETAILS PANEL */}
+              {pipelineStatus.files && pipelineStatus.files.some(f => f.status === "error") && (
+                <div className="mt-6 text-left border border-rose-500/20 bg-rose-950/20 rounded-lg p-4">
+                  <div className="text-[10px] text-rose-400 uppercase font-bold tracking-wider mb-2 flex items-center gap-1.5 px-1">
+                    <XCircle size={10} className="text-rose-400" />
+                    <span>Failed Files Details</span>
+                  </div>
+                  <div className="max-h-[150px] overflow-y-auto scrollbar space-y-2 pr-1">
+                    {pipelineStatus.files
+                      .filter(f => f.status === "error")
+                      .map((f, idx) => (
+                        <div key={idx} className="text-left text-xs bg-black/40 rounded p-2 border border-rose-500/20">
+                          <div className="font-semibold text-rose-300 truncate font-mono text-[11px]" title={f.file_path}>
+                            {f.file_path}
+                          </div>
+                          <div className="text-[10px] text-secondary mt-1 leading-normal break-words">
+                            {f.error || "Unknown analysis error."}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               {pipelineStatus.status === "error" ? (
                 <p className="text-[11px] text-rose-400 mt-6 max-w-xs mx-auto leading-normal font-semibold">

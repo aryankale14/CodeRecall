@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.database import SessionLocal
 from app.models import RepositoryFile
 from app.pipeline_logs import add_pipeline_log
+from app.services.limiter import space_request, generate_content_with_fallback
 
 settings = get_settings()
 
@@ -63,10 +64,15 @@ async def task_a_generate_embedding(content: str) -> list[float]:
     
     if not chunks:
         # Fallback if the file was somehow completely empty of text
+        await space_request()
         return await embeddings_model.aembed_query("Empty file")
         
-    # Get embeddings for all chunks concurrently (handled by langchain)
-    chunk_embeddings = await embeddings_model.aembed_documents(chunks)
+    # Get embeddings for all chunks sequentially (instead of concurrently) to avoid rate limits
+    chunk_embeddings = []
+    for chunk in chunks:
+        await space_request()
+        emb = await embeddings_model.aembed_query(chunk)
+        chunk_embeddings.append(emb)
     
     # If it's a single chunk, just return its vector
     if len(chunk_embeddings) == 1:
@@ -94,8 +100,7 @@ async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, l
     """
     # Force the local client configuration to use the correct API key atomically
     genai.configure(api_key=settings.GEMINI_API_KEY_MAP)
-    model = genai.GenerativeModel("gemini-3.1-flash-lite")
-    model._client = genai_client.get_default_generative_client()
+    model_name = settings.GEMINI_MODEL_MAP
     
     prompt = f"""
     You are an expert Code Reviewer and Security Auditor.
@@ -118,18 +123,19 @@ async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, l
     ```
     """
     
-    # We force the model to reply in strict JSON format using response_mime_type.
-    # This prevents the LLM from adding markdown like ```json ... ``` wrapper.
-    response = await model.generate_content_async(
-        prompt,
-        generation_config=genai.GenerationConfig(
-            response_mime_type="application/json"
-        )
+    # Space out requests to avoid 429 rate limit issues
+    await space_request()
+
+    # Generate content using the fallback-safe helper
+    response_text = await generate_content_with_fallback(
+        model_name=model_name,
+        prompt=prompt,
+        response_mime_type="application/json"
     )
     
     try:
         # Parse the clean JSON response directly
-        result = json.loads(response.text)
+        result = json.loads(response_text)
         summary = {"summary": result.get("summary", "No summary generated.")}
         vulnerabilities = result.get("issues", [])
         return summary, vulnerabilities
@@ -174,19 +180,18 @@ async def process_single_file(file_id: str, semaphore: asyncio.Semaphore, repo_u
         finally:
             db.close()
 
-        # Step 2: Run LLM embedding and summarization in parallel, protected by a timeout!
+        # Step 2: Run LLM embedding and summarization sequentially, spaced out by the rate limiter
         try:
             # We wrap the slow network calls in an asyncio.wait_for block to prevent any infinite hangs.
-            embedding_task = task_a_generate_embedding(content)
-            summary_task = task_b_generate_summary(file_path, content)
-            
-            # 90-second timeout is extremely safe but guarantees we won't hang the worker queue forever.
-            embedding_result, summary_result = await asyncio.wait_for(
-                asyncio.gather(embedding_task, summary_task),
-                timeout=90.0
+            embedding_result = await asyncio.wait_for(
+                task_a_generate_embedding(content),
+                timeout=180.0
             )
             
-            summary_dict, vulnerabilities_list = summary_result
+            summary_dict, vulnerabilities_list = await asyncio.wait_for(
+                task_b_generate_summary(file_path, content),
+                timeout=180.0
+            )
             
             # Step 3: Write results back to the database in a fresh session
             db = SessionLocal()
@@ -209,7 +214,10 @@ async def process_single_file(file_id: str, semaphore: asyncio.Semaphore, repo_u
         except Exception as e:
             # Step 4: Handle any exceptions (LLM rate limits, network timeouts, etc.)
             print(f"[ERROR] Map Phase Error for {file_id}: {str(e)}")
-            add_pipeline_log(repo_url, f"✗ Error analyzing file {file_id[:8]}...: {str(e)[:60]}")
+            
+            # Log the actual file path instead of the UUID to make errors clear to the user
+            friendly_name = file_path if file_path else file_id[:8]
+            add_pipeline_log(repo_url, f"✗ Error analyzing file {friendly_name}: {str(e)[:120]}")
             
             # Open a fresh session to mark the file as error, ensuring we don't hold connections
             db = SessionLocal()
@@ -225,19 +233,19 @@ async def process_single_file(file_id: str, semaphore: asyncio.Semaphore, repo_u
             finally:
                 db.close()
 
+        # Step 5: Sleep between files to stay well within Gemini Free Tier limits (15 RPM)
+        await asyncio.sleep(2.0)
+
 async def trigger_map_phase(file_ids: list[str], repo_url: str = ""):
     """
     The entry point called by the FastAPI route as a Background Task. 
-    It sets up the Semaphore and fires off all processing concurrently.
+    It processes all pending files sequentially using a Semaphore to prevent concurrent execution
+    and stays within Gemini API rate limits.
     """
-    # Semaphore(3) ensures we don't overwhelm the Gemini API rate limits or our server's RAM.
-    # Lowering this to 3 fits perfectly within standard Gemini 15 RPM rate limits.
-    semaphore = asyncio.Semaphore(3)
+    semaphore = asyncio.Semaphore(1)
     
-    # Create a list of tasks
-    tasks = [process_single_file(file_id, semaphore, repo_url) for file_id in file_ids]
-    
-    # Run all tasks asynchronously in the background
-    await asyncio.gather(*tasks)
-    
+    # Process each file one by one sequentially
+    for file_id in file_ids:
+        await process_single_file(file_id, semaphore, repo_url)
+        
     print("[DONE] Map Phase complete for all submitted files! Ready for Reduce Phase.")

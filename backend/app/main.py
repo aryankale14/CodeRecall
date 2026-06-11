@@ -121,20 +121,46 @@ async def ingest_repo(
     repo_url = request.repo_url
     user_id = current_user["uid"]
     
-    # Pre-verify all three API keys to prevent starting a doomed ingestion
+    # Pre-verify all three API keys to prevent starting a doomed ingestion.
+    # If some keys are exhausted/invalid, we fall back to any configured key that is valid to keep the service running.
     settings = get_settings()
     
-    map_err = await verify_gemini_key(settings.GEMINI_API_KEY_MAP)
-    if map_err:
-        return {"status": "error", "message": f"Gemini Map Key error: {map_err}"}
+    keys_status = {}
+    valid_keys = []
+    
+    for key_name, key_val in [
+        ("Map Key", settings.GEMINI_API_KEY_MAP),
+        ("Reduce Key", settings.GEMINI_API_KEY_REDUCE),
+        ("RAG Key", settings.GEMINI_API_KEY_RAG)
+    ]:
+        err = await verify_gemini_key(key_val)
+        if not err:
+            valid_keys.append(key_val)
+            keys_status[key_name] = {"valid": True, "error": None}
+        else:
+            keys_status[key_name] = {"valid": False, "error": err}
+            
+    # If absolutely no keys are valid, we cannot proceed.
+    if not valid_keys:
+        err_msg = "All configured Gemini API Keys are invalid or exhausted:\n"
+        for name, status in keys_status.items():
+            err_msg += f"- {name}: {status['error']}\n"
+        return {"status": "error", "message": err_msg}
         
-    reduce_err = await verify_gemini_key(settings.GEMINI_API_KEY_REDUCE)
-    if reduce_err:
-        return {"status": "error", "message": f"Gemini Reduce Key error: {reduce_err}"}
+    # Dynamically map invalid/exhausted keys to the first valid key
+    fallback_key = valid_keys[0]
+    
+    if not keys_status["Map Key"]["valid"]:
+        print(f"[WARNING] settings.GEMINI_API_KEY_MAP is invalid/exhausted ({keys_status['Map Key']['error']}). Falling back to a valid key.")
+        settings.GEMINI_API_KEY_MAP = fallback_key
         
-    rag_err = await verify_gemini_key(settings.GEMINI_API_KEY_RAG)
-    if rag_err:
-        return {"status": "error", "message": f"Gemini RAG Key error: {rag_err}"}
+    if not keys_status["Reduce Key"]["valid"]:
+        print(f"[WARNING] settings.GEMINI_API_KEY_REDUCE is invalid/exhausted ({keys_status['Reduce Key']['error']}). Falling back to a valid key.")
+        settings.GEMINI_API_KEY_REDUCE = fallback_key
+        
+    if not keys_status["RAG Key"]["valid"]:
+        print(f"[WARNING] settings.GEMINI_API_KEY_RAG is invalid/exhausted ({keys_status['RAG Key']['error']}). Falling back to a valid key.")
+        settings.GEMINI_API_KEY_RAG = fallback_key
     
     # 1. Phase 1: Ingestion & Static Analysis (Run in a thread pool to avoid blocking the event loop)
     # This clones the repo, filters files, and saves pending files to DB.
@@ -343,6 +369,24 @@ def repo_status(repo_url: str, db: Session = Depends(get_db), current_user: dict
         # This means the pipeline has finished but failed to generate a report.
         status = "error"
 
+    # Fetch the list of files to show status/errors in the frontend
+    db_files = db.query(RepositoryFile).filter(
+        RepositoryFile.repo_url == repo_url,
+        RepositoryFile.user_id == user_id,
+        RepositoryFile.file_path != "__GLOBAL_REPORT__"
+    ).order_by(RepositoryFile.file_path).all()
+
+    files_status = []
+    for f in db_files:
+        err_msg = None
+        if f.status == "error" and isinstance(f.explanation_summary, dict):
+            err_msg = f.explanation_summary.get("error")
+        files_status.append({
+            "file_path": f.file_path,
+            "status": f.status,
+            "error": err_msg
+        })
+
     return {
         "repo_url": repo_url,
         "status": status,
@@ -351,7 +395,8 @@ def repo_status(repo_url: str, db: Session = Depends(get_db), current_user: dict
         "completed_files": completed_count,
         "pending_files": pending_count,
         "processing_files": processing_count,
-        "error_files": error_count
+        "error_files": error_count,
+        "files": files_status
     }
 
 @app.get("/api/repo/report")

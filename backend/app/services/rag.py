@@ -39,15 +39,31 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
         RepositoryFile.repo_url == repo_url,
         RepositoryFile.user_id == user_id,
         RepositoryFile.embedding.isnot(None),
-        RepositoryFile.file_path != "__GLOBAL_REPORT__" # Exclude the global report from code search
+        RepositoryFile.file_path != "__GLOBAL_REPORT__", # Exclude the global report from code search
+        ~RepositoryFile.file_path.ilike("%.md"),        # Exclude README and other markdown documentation
+        ~RepositoryFile.file_path.ilike("%.txt"),       # Exclude raw text files
+        ~RepositoryFile.file_path.ilike("%package-lock.json"),
+        ~RepositoryFile.file_path.ilike("%pnpm-lock.yaml"),
+        ~RepositoryFile.file_path.ilike("%yarn.lock")
     ).order_by(
         RepositoryFile.embedding.cosine_distance(question_vector)
     ).limit(top_k).all()
 
-    if not similar_files:
-        return "I couldn't find any relevant code in this repository to answer your question. Is the repo fully processed?"
+    # 3. Fetch the global architecture report if it exists to help answer high-level questions
+    global_report = db.query(RepositoryFile).filter(
+        RepositoryFile.repo_url == repo_url,
+        RepositoryFile.user_id == user_id,
+        RepositoryFile.file_path == "__GLOBAL_REPORT__"
+    ).first()
+    
+    global_overview = ""
+    if global_report and isinstance(global_report.explanation_summary, dict):
+        global_overview = global_report.explanation_summary.get("global_overview", "")
 
-    # 3. Build the Context String
+    if not similar_files and not global_overview:
+        return "I couldn't find any relevant code or overview in this repository to answer your question. Is the repository fully processed?"
+
+    # 4. Build the Context String
     context_blocks = []
     for f in similar_files:
         # We cap the content length just in case a massive file was retrieved,
@@ -57,21 +73,29 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
         
     context_text = "\n".join(context_blocks)
 
-    # 4. Generate Answer using the Gemini Chat Model
+    # 5. Generate Answer using the Gemini Chat Model
     # Force the local client configuration to use the correct API key atomically
     genai.configure(api_key=settings.GEMINI_API_KEY_RAG)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel(settings.GEMINI_MODEL_RAG)
     model._client = genai_client.get_default_generative_client()
     
     prompt = f"""
-    You are an expert AI Code Assistant. Answer the user's question about their codebase using ONLY the provided code context below.
-    If the context doesn't contain enough information to fully answer the question, state that clearly, but try your best.
+    You are an expert AI Code Assistant. Answer the user's question about their codebase using the provided project overview and code context.
     Always cite the file paths when you refer to specific logic.
 
     USER QUESTION: {question}
+    """
 
+    if global_overview:
+        prompt += f"""
+    PROJECT OVERVIEW:
+        {global_overview}
+    """
+
+    if context_text:
+        prompt += f"""
     CODE CONTEXT:
-    {context_text}
+        {context_text}
     """
 
     response = await model.generate_content_async(prompt)

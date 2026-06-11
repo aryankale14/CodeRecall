@@ -9,6 +9,7 @@ from google.api_core.exceptions import GoogleAPICallError, InvalidArgument, Perm
 from app.config import get_settings
 from app.models import RepositoryFile
 from app.pipeline_logs import add_pipeline_log
+from app.services.limiter import space_request, generate_content_with_fallback
 
 settings = get_settings()
 
@@ -75,8 +76,7 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
     # perfect for reading thousands of summaries at once!
     # Force the local client configuration to use the correct API key atomically
     genai.configure(api_key=settings.GEMINI_API_KEY_REDUCE)
-    model = genai.GenerativeModel("gemini-3.5-flash")
-    model._client = genai_client.get_default_generative_client()
+    model_name = settings.GEMINI_MODEL_REDUCE
 
     @retry(
         retry=retry_if_exception(is_transient_error),
@@ -93,8 +93,8 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
         FILE SUMMARIES:
         {all_summaries_text}
         """
-        response = await model.generate_content_async(prompt)
-        return response.text
+        await space_request()
+        return await generate_content_with_fallback(model_name, prompt)
 
     @retry(
         retry=retry_if_exception(is_transient_error),
@@ -143,8 +143,8 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
         RAW VULNERABILITIES:
         {all_vulns_text}
         """
-        response = await model.generate_content_async(prompt)
-        return response.text
+        await space_request()
+        return await generate_content_with_fallback(model_name, prompt)
 
     # Run both massive prompts concurrently
     print("[INFO] Master LLMs are now reading the entire project context...")
