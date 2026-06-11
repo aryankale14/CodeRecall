@@ -3156,3 +3156,67 @@ h2, h3, h4 {
   text-align: center !important;
 }
 
+/* Reduce phase funny status excuses banner */
+.reduce-excuse-banner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-top: 16px !important;
+  padding: 16px 20px !important;
+  border-radius: 12px !important;
+  border-left: 4px solid #C05621 !important; /* Terracotta left border */
+  border-top: 1px solid rgba(229, 222, 201, 0.6) !important;
+  border-right: 1px solid rgba(229, 222, 201, 0.6) !important;
+  border-bottom: 1px solid rgba(229, 222, 201, 0.6) !important;
+  background: linear-gradient(135deg, #FAF8F5 0%, #F3EEE3 100%) !important;
+  box-shadow: 0 4px 15px rgba(192, 86, 33, 0.05) !important;
+  animation: bannerSoftPulse 3s infinite ease-in-out !important;
+  transition: all 0.3s ease !important;
+}
+
+.reduce-excuse-banner .excuse-icon {
+  color: #C05621 !important;
+  flex-shrink: 0 !important;
+}
+
+.reduce-excuse-banner .excuse-text {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #2D3748 !important;
+  line-height: 1.5 !important;
+}
+
+/* Dark theme overrides for the excuses banner */
+.dark .reduce-excuse-banner {
+  border-left: 4px solid #22d3ee !important; /* Neon cyan left border */
+  border-top: 1px solid rgba(34, 211, 238, 0.15) !important;
+  border-right: 1px solid rgba(34, 211, 238, 0.15) !important;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.15) !important;
+  background: linear-gradient(135deg, #0f172a 0%, #020617 100%) !important;
+  box-shadow: 0 4px 20px rgba(34, 211, 238, 0.05) !important;
+}
+
+.dark .reduce-excuse-banner .excuse-icon {
+  color: #22d3ee !important;
+}
+
+.dark .reduce-excuse-banner .excuse-text {
+  color: #e2e8f0 !important;
+}
+
+@keyframes bannerSoftPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.97;
+  }
+  50% {
+    transform: scale(1.005);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.97;
+  }
+}
+
+

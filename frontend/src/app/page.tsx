@@ -110,14 +110,14 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://coderecall.o
 const ADMIN_EMAIL = "aryankale1410@gmail.com";
 
 const FUNNY_EXCUSES = [
-  "Gemini is taking a coffee break. Free-tier struggles are real...",
-  "Negotiating with the Master Architect. He's demanding a raise in tokens...",
-  "Asking the Security Auditor to look away from our API key limits...",
-  "Render's free-tier CPU is pedaling its bicycle generator as fast as it can...",
-  "Translating 52 files from 'developer gibberish' to 'architect speak'...",
-  "Waiting for the Gemini model to wake up from its rate-limit nap...",
-  "The Master Explainer is drafting a 500-page report. Please hold...",
-  "Trying to fit the entire repository structure into a free-tier context window..."
+  "☕ Gemini is taking a coffee break. Free-tier struggles are real...",
+  "🤝 Negotiating with the Master Architect. He wants a raise in tokens...",
+  "🙈 Asking the Security Auditor to look away from our API key limits...",
+  "🚴 Render's free-tier CPU is pedaling its bicycle generator as fast as it can...",
+  "📝 Translating files from 'developer gibberish' to 'architect speak'...",
+  "😴 Waiting for the Gemini model to wake up from its rate-limit nap...",
+  "📜 The Master Explainer is drafting a 500-page report. Please hold...",
+  "📦 Trying to fit the entire repository structure into a free-tier context window..."
 ];
 
 export default function Home() {
@@ -1357,7 +1357,7 @@ export default function Home() {
                     <span>Overall Progress</span>
                     <span className="text-cyan-400 font-mono">
                       {Math.round(
-                        (pipelineStatus.completed_files / pipelineStatus.total_files) * 100
+                        ((pipelineStatus.completed_files + pipelineStatus.error_files) / pipelineStatus.total_files) * 100
                       )}
                       %
                     </span>
@@ -1373,9 +1373,9 @@ export default function Home() {
                   {pipelineStatus.total_files > 0 && 
                    (pipelineStatus.completed_files + pipelineStatus.error_files === pipelineStatus.total_files) && 
                    pipelineStatus.status === "processing" && (
-                    <div className="flex items-center gap-2.5 mt-3 p-3 bg-cyan-950/20 border border-cyan-500/20 rounded-md animate-pulse">
-                      <RefreshCw size={14} className="text-cyan-400 animate-spin flex-shrink-0" />
-                      <span className="text-[11px] text-cyan-300 leading-snug">
+                    <div className="reduce-excuse-banner">
+                      <RefreshCw size={14} className="excuse-icon animate-spin" />
+                      <span className="excuse-text">
                         {FUNNY_EXCUSES[funnyExcuseIdx]}
                       </span>
                     </div>
