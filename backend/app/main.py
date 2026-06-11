@@ -379,13 +379,17 @@ def repo_status(repo_url: str, db: Session = Depends(get_db), current_user: dict
         RepositoryFile.file_path != "__GLOBAL_REPORT__"
     ).count()
 
-    # Check if the Reduce phase is currently active in the background
+    # Check if any phase failed in the logs
     logs = get_pipeline_logs(repo_url)
+    phase1_failed = any("Phase 1 failed" in log["message"] for log in logs)
+    reduce_failed = any("Phase 3: Reduce failed" in log["message"] for log in logs)
     reduce_started = any("Phase 3: Reduce — synthesizing" in log["message"] for log in logs)
     reduce_finished = any("Phase 3: Reduce complete" in log["message"] or "Phase 3: Reduce failed" in log["message"] for log in logs)
     reduce_active = reduce_started and not reduce_finished
 
-    if has_report:
+    if phase1_failed or reduce_failed:
+        status = "error"
+    elif has_report:
         status = "completed"
     elif reduce_active:
         status = "processing"
@@ -394,9 +398,14 @@ def repo_status(repo_url: str, db: Session = Depends(get_db), current_user: dict
     elif pending_count > 0:
         status = "pending"
     else:
-        # No files are pending, processing, or reducing, and there is no report.
-        # This means the pipeline has finished but failed to generate a report.
-        status = "error"
+        # All files are completed/error, and there's no report yet.
+        # If we have files in the database, we are transitioning from Map to Reduce.
+        # But if total_files is 0, it means we haven't even finished Phase 1 ingestion yet.
+        total_files = pending_count + processing_count + completed_count + error_count
+        if total_files > 0:
+            status = "processing"
+        else:
+            status = "pending"
 
     # Fetch the list of files to show status/errors in the frontend
     db_files = db.query(RepositoryFile).filter(
