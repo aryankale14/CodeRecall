@@ -64,15 +64,14 @@ async def task_a_generate_embedding(content: str) -> list[float]:
     
     if not chunks:
         # Fallback if the file was somehow completely empty of text
-        await space_request()
         return await embeddings_model.aembed_query("Empty file")
         
-    # Get embeddings for all chunks sequentially (instead of concurrently) to avoid rate limits
-    chunk_embeddings = []
-    for chunk in chunks:
-        await space_request()
-        emb = await embeddings_model.aembed_query(chunk)
-        chunk_embeddings.append(emb)
+    # Get embeddings for all chunks concurrently using asyncio.gather.
+    # The text-embedding-004 model supports up to 1,500 Requests Per Minute (RPM) on the free tier,
+    # so we can safely execute chunk embeddings in parallel for maximum speed.
+    chunk_embeddings = await asyncio.gather(*[
+        embeddings_model.aembed_query(chunk) for chunk in chunks
+    ])
     
     # If it's a single chunk, just return its vector
     if len(chunk_embeddings) == 1:
@@ -233,8 +232,8 @@ async def process_single_file(file_id: str, semaphore: asyncio.Semaphore, repo_u
             finally:
                 db.close()
 
-        # Step 5: Sleep between files to stay well within Gemini Free Tier limits (15 RPM)
-        await asyncio.sleep(2.0)
+        # File analysis finished, moving to next file immediately since space_request handles rate limits.
+        pass
 
 async def trigger_map_phase(file_ids: list[str], repo_url: str = ""):
     """

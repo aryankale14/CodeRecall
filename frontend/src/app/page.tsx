@@ -109,6 +109,17 @@ interface PublicStats {
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://coderecall.onrender.com";
 const ADMIN_EMAIL = "aryankale1410@gmail.com";
 
+const FUNNY_EXCUSES = [
+  "Gemini is taking a coffee break. Free-tier struggles are real...",
+  "Negotiating with the Master Architect. He's demanding a raise in tokens...",
+  "Asking the Security Auditor to look away from our API key limits...",
+  "Render's free-tier CPU is pedaling its bicycle generator as fast as it can...",
+  "Translating 52 files from 'developer gibberish' to 'architect speak'...",
+  "Waiting for the Gemini model to wake up from its rate-limit nap...",
+  "The Master Explainer is drafting a 500-page report. Please hold...",
+  "Trying to fit the entire repository structure into a free-tier context window..."
+];
+
 export default function Home() {
   // Navigation & Workspace State
   const [repos, setRepos] = useState<Repository[]>([]);
@@ -192,6 +203,9 @@ export default function Home() {
   // Live Pipeline Progress Logs & Auto-scroll Ref
   const [pipelineLogs, setPipelineLogs] = useState<{ time: string; message: string }[]>([]);
   const terminalRef = useRef<HTMLDivElement | null>(null);
+
+  // Funny excuses timer during the Reduce Phase
+  const [funnyExcuseIdx, setFunnyExcuseIdx] = useState(0);
 
   // Repository Deletion Overlay States
   const [deleteConfirmRepo, setDeleteConfirmRepo] = useState<string | null>(null);
@@ -284,6 +298,28 @@ export default function Home() {
 
     return () => unsubscribe();
   }, []);
+
+  // Funny excuses rotation timer during the Reduce Phase
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    const isReducing = 
+      pipelineStatus && 
+      pipelineStatus.total_files > 0 && 
+      (pipelineStatus.completed_files + pipelineStatus.error_files === pipelineStatus.total_files) && 
+      pipelineStatus.status === "processing";
+      
+    if (isReducing) {
+      interval = setInterval(() => {
+        setFunnyExcuseIdx((prev) => (prev + 1) % FUNNY_EXCUSES.length);
+      }, 3000);
+    } else {
+      setFunnyExcuseIdx(0);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [pipelineStatus]);
 
   // Landing page scroll observer for reveal animations + sticky nav
   useEffect(() => {
@@ -1330,10 +1366,20 @@ export default function Home() {
                     <div
                       className="progress-bar-fill"
                       style={{
-                        width: `${(pipelineStatus.completed_files / pipelineStatus.total_files) * 100}%`
+                        width: `${((pipelineStatus.completed_files + pipelineStatus.error_files) / pipelineStatus.total_files) * 100}%`
                       }}
                     />
                   </div>
+                  {pipelineStatus.total_files > 0 && 
+                   (pipelineStatus.completed_files + pipelineStatus.error_files === pipelineStatus.total_files) && 
+                   pipelineStatus.status === "processing" && (
+                    <div className="flex items-center gap-2.5 mt-3 p-3 bg-cyan-950/20 border border-cyan-500/20 rounded-md animate-pulse">
+                      <RefreshCw size={14} className="text-cyan-400 animate-spin flex-shrink-0" />
+                      <span className="text-[11px] text-cyan-300 leading-snug">
+                        {FUNNY_EXCUSES[funnyExcuseIdx]}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-xs text-muted italic">Cloning repo & indexing folder trees...</p>
