@@ -102,7 +102,7 @@ export const getIdToken = async (user: any): Promise<string | null> => {
   
   try {
     const firebaseUser = user as FirebaseUser;
-    return await firebaseUser.getIdToken(true); // Force refresh to prevent expiration issues
+    return await firebaseUser.getIdToken(false); // Use cached token to avoid Firebase rate-limiting on frequent polls
   } catch (err) {
     console.error("Failed to fetch ID Token:", err);
     return null;

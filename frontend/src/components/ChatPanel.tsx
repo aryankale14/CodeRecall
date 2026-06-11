@@ -62,7 +62,7 @@ export default function ChatPanel({ repoUrl, user }: ChatPanelProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken || "mock_local_developer_token"}`
+          "Authorization": idToken ? `Bearer ${idToken}` : ""
         },
         body: JSON.stringify({
           repo_url: repoUrl,

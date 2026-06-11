@@ -206,7 +206,7 @@ export default function Home() {
       const token = await getIdToken(currentUser);
       const res = await fetch(`${BACKEND_URL}/api/repos`, {
         headers: {
-          "Authorization": `Bearer ${token || "mock_local_developer_token"}`
+          "Authorization": token ? `Bearer ${token}` : ""
         }
       });
       const data = await res.json();
@@ -225,7 +225,7 @@ export default function Home() {
       const token = await getIdToken(currentUser);
       const res = await fetch(`${BACKEND_URL}/api/analytics`, {
         headers: {
-          "Authorization": `Bearer ${token || "mock_local_developer_token"}`
+          "Authorization": token ? `Bearer ${token}` : ""
         }
       });
       const data = await res.json();
@@ -343,7 +343,7 @@ export default function Home() {
         const token = await getIdToken(user);
         const res = await fetch(`${BACKEND_URL}/api/repo/status?repo_url=${encodeURIComponent(repoUrl)}`, {
           headers: {
-            "Authorization": `Bearer ${token || "mock_local_developer_token"}`
+            "Authorization": token ? `Bearer ${token}` : ""
           }
         });
         const statusData: Repository = await res.json();
@@ -397,7 +397,7 @@ export default function Home() {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token || "mock_local_developer_token"}`
+          "Authorization": token ? `Bearer ${token}` : ""
         },
         body: JSON.stringify({ repo_url: pipelineStatus.repo_url })
       });
@@ -436,7 +436,7 @@ export default function Home() {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token || "mock_local_developer_token"}`
+          "Authorization": token ? `Bearer ${token}` : ""
         },
         body: JSON.stringify({ repo_url: repoUrl })
       });
@@ -468,7 +468,7 @@ export default function Home() {
       const token = await getIdToken(currentUser);
       const res = await fetch(`${BACKEND_URL}/api/repo/report?repo_url=${encodeURIComponent(repoUrl)}`, {
         headers: {
-          "Authorization": `Bearer ${token || "mock_local_developer_token"}`
+          "Authorization": token ? `Bearer ${token}` : ""
         }
       });
       const data: RepoReport = await res.json();
@@ -498,7 +498,7 @@ export default function Home() {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token || "mock_local_developer_token"}`
+          "Authorization": token ? `Bearer ${token}` : ""
         },
         body: JSON.stringify({ repo_url: targetUrl })
       });
@@ -562,7 +562,7 @@ export default function Home() {
         )}&file_path=${encodeURIComponent(filePath)}`,
         {
           headers: {
-            "Authorization": `Bearer ${token || "mock_local_developer_token"}`
+            "Authorization": token ? `Bearer ${token}` : ""
           }
         }
       );

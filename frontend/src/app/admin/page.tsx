@@ -109,7 +109,7 @@ export default function AdminPage() {
       const token = await getIdToken(user);
       const res = await fetch(`${BACKEND_URL}/api/analytics/admin`, {
         headers: {
-          "Authorization": `Bearer ${token || "mock_local_developer_token"}`
+          "Authorization": token ? `Bearer ${token}` : ""
         }
       });
       if (res.status === 403) {
