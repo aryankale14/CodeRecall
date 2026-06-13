@@ -90,6 +90,8 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
         Synthesize this information and write a comprehensive "Global Project Overview".
         Explain the overall architecture, what the project does, and how the main components interact.
         
+        YOU MUST COMPULSORILY include a detailed, clean visual architecture diagram using Mermaid.js syntax inside a code block (```mermaid ... ```) at the end of your overview. The diagram must map out the database schemas/interactions, key directories, API endpoints, and system logic flows of the project.
+        
         FILE SUMMARIES:
         {all_summaries_text}
         """
