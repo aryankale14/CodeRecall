@@ -36,7 +36,7 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
     # 2. Perform Cosine Similarity Search in PostgreSQL
     # pgvector provides the `cosine_distance` method. 
     # We want the lowest distance (highest similarity).
-    top_k = 5
+    top_k = 10
     similar_files = db.query(RepositoryFile).filter(
         RepositoryFile.repo_url == repo_url,
         RepositoryFile.user_id == user_id,

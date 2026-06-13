@@ -128,11 +128,11 @@ async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, l
     You are an expert Code Reviewer and Security Auditor.
     Analyze the following code from the file: `{file_path}`
     
-    If this file is extremely long, do not try to explain every single line. Focus on summarizing the core classes, the primary exported functions, and any obvious security vulnerabilities.
+    If this file is extremely long, do not try to explain every single line. Focus on summarizing the core classes, the primary exported functions, key external integrations/APIs, hardcoded configuration values (like model names, API models, ports), and any obvious security vulnerabilities.
     
     Return your analysis STRICTLY as a JSON object with this exact format:
     {{
-        "summary": "A detailed 2-3 paragraph explanation of what this file does, its logic, and its purpose in the overall project.",
+        "summary": "A detailed 2-3 paragraph explanation of what this file does, its logic, hardcoded configurations (such as model names/strings or ports), external APIs used, and its purpose in the overall project.",
         "issues": [
             {{"type": "vulnerability", "description": "SQL injection at line X...", "severity": "High"}},
             {{"type": "dead_code", "description": "Function unused_xyz() is never called.", "severity": "Low"}}
