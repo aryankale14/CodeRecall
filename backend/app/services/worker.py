@@ -159,13 +159,13 @@ async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, l
         err_str = str(e).upper()
         if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str:
             if settings.GEMINI_API_KEY_MAP_FALLBACK and settings.GEMINI_API_KEY_MAP != settings.GEMINI_API_KEY_MAP_FALLBACK:
-                print("[DYNAMIC FALLBACK] Map key exhausted during run. Switching to Map Fallback Key and gemini-2.5-flash in memory.")
+                print("[DYNAMIC FALLBACK] Map key exhausted during run. Switching to Map Fallback Key and gemini-3.1-flash-lite in memory.")
                 settings.GEMINI_API_KEY_MAP = settings.GEMINI_API_KEY_MAP_FALLBACK
-                settings.GEMINI_MODEL_MAP = "gemini-2.5-flash"
+                settings.GEMINI_MODEL_MAP = "gemini-3.1-flash-lite"
                 genai.configure(api_key=settings.GEMINI_API_KEY_MAP)
                 # Retry once after switching
                 response_text = await generate_content_with_fallback(
-                    model_name="gemini-2.5-flash",
+                    model_name="gemini-3.1-flash-lite",
                     prompt=prompt,
                     response_mime_type="application/json"
                 )

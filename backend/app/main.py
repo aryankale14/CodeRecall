@@ -232,37 +232,37 @@ async def ingest_repo(
     if is_valid(settings.GEMINI_API_KEY_MAP):
         pass
     elif is_valid(settings.GEMINI_API_KEY_MAP_FALLBACK):
-        print("[FALLBACK] Map Key failed. Using GEMINI_API_KEY_MAP_FALLBACK with gemini-2.5-flash.")
+        print("[FALLBACK] Map Key failed. Using GEMINI_API_KEY_MAP_FALLBACK with gemini-3.1-flash-lite.")
         settings.GEMINI_API_KEY_MAP = settings.GEMINI_API_KEY_MAP_FALLBACK
-        settings.GEMINI_MODEL_MAP = "gemini-2.5-flash"
+        settings.GEMINI_MODEL_MAP = "gemini-3.1-flash-lite"
     else:
         print("[WARNING] Both Map Key and its Fallback failed! Using the first valid key in the pool.")
         settings.GEMINI_API_KEY_MAP = valid_key_pool[0]
-        settings.GEMINI_MODEL_MAP = "gemini-2.5-flash"
+        settings.GEMINI_MODEL_MAP = "gemini-3.1-flash-lite"
         
     # 3. Reduce Key Resolution
     if is_valid(settings.GEMINI_API_KEY_REDUCE):
         pass
     elif is_valid(settings.GEMINI_API_KEY_REDUCE_FALLBACK):
-        print("[FALLBACK] Reduce Key failed. Using GEMINI_API_KEY_REDUCE_FALLBACK with gemini-2.5-flash.")
+        print("[FALLBACK] Reduce Key failed. Using GEMINI_API_KEY_REDUCE_FALLBACK with gemini-3.5-flash.")
         settings.GEMINI_API_KEY_REDUCE = settings.GEMINI_API_KEY_REDUCE_FALLBACK
-        settings.GEMINI_MODEL_REDUCE = "gemini-2.5-flash"
+        settings.GEMINI_MODEL_REDUCE = "gemini-3.5-flash"
     else:
         print("[WARNING] Both Reduce Key and its Fallback failed! Using the first valid key in the pool.")
         settings.GEMINI_API_KEY_REDUCE = valid_key_pool[0]
-        settings.GEMINI_MODEL_REDUCE = "gemini-2.5-flash"
+        settings.GEMINI_MODEL_REDUCE = "gemini-3.5-flash"
         
     # 4. RAG Key Resolution
     if is_valid(settings.GEMINI_API_KEY_RAG):
         pass
     elif is_valid(settings.GEMINI_API_KEY_RAG_FALLBACK):
-        print("[FALLBACK] RAG Key failed. Using GEMINI_API_KEY_RAG_FALLBACK with gemini-2.5-flash.")
+        print("[FALLBACK] RAG Key failed. Using GEMINI_API_KEY_RAG_FALLBACK with gemini-3.5-flash.")
         settings.GEMINI_API_KEY_RAG = settings.GEMINI_API_KEY_RAG_FALLBACK
-        settings.GEMINI_MODEL_RAG = "gemini-2.5-flash"
+        settings.GEMINI_MODEL_RAG = "gemini-3.5-flash"
     else:
         print("[WARNING] Both RAG Key and its Fallback failed! Using the first valid key in the pool.")
         settings.GEMINI_API_KEY_RAG = valid_key_pool[0]
-        settings.GEMINI_MODEL_RAG = "gemini-2.5-flash"
+        settings.GEMINI_MODEL_RAG = "gemini-3.5-flash"
     
     # 1. Phase 1: Ingestion & Static Analysis (Run in a thread pool to avoid blocking the event loop)
     # This clones the repo, filters files, and saves pending files to DB.

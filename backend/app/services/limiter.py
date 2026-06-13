@@ -23,8 +23,8 @@ async def space_request(min_interval: float = 4.0):
 async def generate_content_with_fallback(model_name: str, prompt: str, response_mime_type: str = None) -> str:
     """
     Attempts to generate content with the configured model. 
-    If a 429 rate limit or daily quota exceeded error occurs, it automatically falls back to 'gemini-2.5-flash'
-    (which has 1500 requests per day limit compared to 20 for newer/experimental models on the free tier).
+    If a 429 rate limit or daily quota exceeded error occurs, it automatically falls back to 'gemini-3.5-flash'
+    or 'gemini-3.1-flash-lite' (to stay within high daily limits on the free tier).
     """
     try:
         model = genai.GenerativeModel(model_name)
