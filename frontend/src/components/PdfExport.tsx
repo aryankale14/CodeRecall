@@ -22,82 +22,98 @@ export interface RepoReport {
   vulnerabilities: Vulnerability[];
 }
 
+// Helper map for unicode characters to prevent jsPDF corruption
+const unicodeMap: { [key: string]: string } = {
+  // Arrows
+  "→": "->",
+  "➔": "->",
+  "➡": "->",
+  "➤": "->",
+  "▶": "->",
+  "⇒": "=>",
+  "⟹": "=>",
+  "←": "<-",
+  "⇐": "<=",
+  "↔": "<->",
+  "↑": "^",
+  "↓": "v",
+  // Em dash & En dash
+  "—": "-",
+  "–": "-",
+  "…": "...",
+  // Box drawing characters
+  "┌": "+",
+  "┐": "+",
+  "└": "+",
+  "┘": "+",
+  "├": "+",
+  "┤": "+",
+  "┬": "+",
+  "┴": "+",
+  "┼": "+",
+  "─": "-",
+  "│": "|",
+  "═": "=",
+  "║": "|",
+  "╒": "+",
+  "╓": "+",
+  "╔": "+",
+  "╕": "+",
+  "╖": "+",
+  "╗": "+",
+  "╘": "+",
+  "╙": "+",
+  "╚": "+",
+  "╛": "+",
+  "╜": "+",
+  "╝": "+",
+  "╞": "+",
+  "╟": "+",
+  "╠": "+",
+  "╡": "+",
+  "╢": "+",
+  "╣": "+",
+  "╤": "+",
+  "╥": "+",
+  "╦": "+",
+  "╧": "+",
+  "╨": "+",
+  "╩": "+",
+  "╪": "+",
+  "╫": "+",
+  "╬": "+",
+  // Bullets / Shapes
+  "•": "*",
+  "●": "*",
+  "■": "*",
+  "▪": "*",
+  "◆": "*",
+  "▲": "^",
+  "▼": "v",
+  "✔": "[Y]",
+  "✘": "[X]",
+  "✓": "[Y]",
+  "✗": "[X]",
+};
+
+// Helper to clean up code lines while preserving indentation and mapping box characters
+function cleanCodeLine(text: string): string {
+  if (!text) return "";
+  let clean = text;
+  
+  // Replace each mapped unicode character
+  for (const [unicode, ascii] of Object.entries(unicodeMap)) {
+    const escapedKey = unicode.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+    clean = clean.replace(new RegExp(escapedKey, "g"), ascii);
+  }
+
+  // Strip remaining non-ASCII characters to keep built-in courier clean
+  return clean.replace(/[^\x00-\x7F]/g, "");
+}
+
 // Helper to strip markdown characters and map non-ASCII characters to prevent jsPDF corruption
 function stripMarkdown(text: string): string {
   if (!text) return "";
-
-  const unicodeMap: { [key: string]: string } = {
-    // Arrows
-    "→": "->",
-    "➔": "->",
-    "➡": "->",
-    "➤": "->",
-    "▶": "->",
-    "⇒": "=>",
-    "⟹": "=>",
-    "←": "<-",
-    "⇐": "<=",
-    "↔": "<->",
-    "↑": "^",
-    "↓": "v",
-    // Em dash & En dash
-    "—": "-",
-    "–": "-",
-    "…": "...",
-    // Box drawing characters
-    "┌": "+",
-    "┐": "+",
-    "└": "+",
-    "┘": "+",
-    "├": "+",
-    "┤": "+",
-    "┬": "+",
-    "┴": "+",
-    "┼": "+",
-    "─": "-",
-    "│": "|",
-    "═": "=",
-    "║": "|",
-    "╒": "+",
-    "╓": "+",
-    "╔": "+",
-    "╕": "+",
-    "╖": "+",
-    "╗": "+",
-    "╘": "+",
-    "╙": "+",
-    "╚": "+",
-    "╛": "+",
-    "╜": "+",
-    "╝": "+",
-    "╞": "+",
-    "╟": "+",
-    "╠": "+",
-    "╡": "+",
-    "╢": "+",
-    "╣": "+",
-    "╤": "+",
-    "╥": "+",
-    "╦": "+",
-    "╧": "+",
-    "╨": "+",
-    "╩": "+",
-    "╪": "+",
-    "╫": "+",
-    "╬": "+",
-    // Bullets / Shapes
-    "•": "*",
-    "●": "*",
-    "■": "*",
-    "▪": "*",
-    "◆": "*",
-    "▲": "^",
-    "▼": "v",
-    "✔": "[Y]",
-    "✘": "[X]",
-    "✓": "[Y]",
-    "✗": "[X]",
-  };
 
   let clean = text;
   
@@ -162,9 +178,50 @@ export function generatePdf(report: RepoReport): void {
   ): number => {
     let currentY = startY;
     const paragraphs = text.split("\n");
+    let inCodeBlock = false;
 
     for (let p = 0; p < paragraphs.length; p++) {
-      let line = paragraphs[p].trim();
+      const rawLine = paragraphs[p];
+      const trimmedLine = rawLine.trim();
+
+      // Check for code block boundary
+      if (trimmedLine.startsWith("```")) {
+        inCodeBlock = !inCodeBlock;
+        continue; // Skip the delimiter line itself
+      }
+
+      if (inCodeBlock) {
+        // Check page boundary
+        if (currentY > pageHeight - footerMargin - 10) {
+          doc.addPage();
+          currentPageNum++;
+          drawHeaderFooter(doc, currentPageNum);
+          currentY = 25;
+        }
+
+        const codeLine = cleanCodeLine(rawLine.replace(/\r$/, ""));
+        doc.setFont("courier", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(31, 41, 55);
+
+        const splitLines = codeLine ? doc.splitTextToSize(codeLine, contentWidth) : [""];
+        for (let i = 0; i < splitLines.length; i++) {
+          if (currentY > pageHeight - footerMargin - 10) {
+            doc.addPage();
+            currentPageNum++;
+            drawHeaderFooter(doc, currentPageNum);
+            currentY = 25;
+            doc.setFont("courier", "normal");
+            doc.setFontSize(8.5);
+            doc.setTextColor(31, 41, 55);
+          }
+          doc.text(splitLines[i], marginX, currentY);
+          currentY += 4.5;
+        }
+        continue;
+      }
+
+      let line = trimmedLine;
       if (!line) {
         currentY += 4; // Add generous paragraph separation spacing to avoid congestion!
         continue;
