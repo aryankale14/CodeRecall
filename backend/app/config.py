@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # Key 3: Used for generating Embeddings and answering RAG Q/A.
     # This key needs to be fast and responsive for user chats.
     GEMINI_API_KEY_RAG: str = ""
+    
+    # Optional Fallback Keys: Used if any of the main keys are invalid or exhausted.
+    GEMINI_API_KEY_FALLBACK_1: str = ""
+    GEMINI_API_KEY_FALLBACK_2: str = ""
+    GEMINI_API_KEY_FALLBACK_3: str = ""
 
     # ---------------------------------------------------------
     # MODEL CONFIGURATIONS - Defaulting to latest GA models

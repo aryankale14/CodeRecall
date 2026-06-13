@@ -150,28 +150,35 @@ async def ingest_repo(
     repo_url = request.repo_url
     user_id = current_user["uid"]
     
-    # Pre-verify all three API keys to prevent starting a doomed ingestion.
+    # Pre-verify all API keys (including optional fallbacks) to prevent starting a doomed ingestion.
     # If some keys are exhausted/invalid, we fall back to any configured key that is valid to keep the service running.
     settings = get_settings()
     
     keys_status = {}
     valid_keys = []
     
-    for key_name, key_val in [
+    candidate_keys = [
         ("Map Key", settings.GEMINI_API_KEY_MAP),
         ("Reduce Key", settings.GEMINI_API_KEY_REDUCE),
-        ("RAG Key", settings.GEMINI_API_KEY_RAG)
-    ]:
+        ("RAG Key", settings.GEMINI_API_KEY_RAG),
+        ("Fallback Key 1", settings.GEMINI_API_KEY_FALLBACK_1),
+        ("Fallback Key 2", settings.GEMINI_API_KEY_FALLBACK_2),
+        ("Fallback Key 3", settings.GEMINI_API_KEY_FALLBACK_3),
+    ]
+    
+    for name, key_val in candidate_keys:
+        if not key_val:
+            continue
         err = await verify_gemini_key(key_val)
         if not err:
             valid_keys.append(key_val)
-            keys_status[key_name] = {"valid": True, "error": None}
+            keys_status[name] = {"valid": True, "error": None}
         else:
-            keys_status[key_name] = {"valid": False, "error": err}
+            keys_status[name] = {"valid": False, "error": err}
             
     # If absolutely no keys are valid, we cannot proceed.
     if not valid_keys:
-        err_msg = "All configured Gemini API Keys are invalid or exhausted:\n"
+        err_msg = "All configured Gemini API Keys (including fallbacks) are invalid or exhausted:\n"
         for name, status in keys_status.items():
             err_msg += f"- {name}: {status['error']}\n"
         return {"status": "error", "message": err_msg}
@@ -179,16 +186,16 @@ async def ingest_repo(
     # Dynamically map invalid/exhausted keys to the first valid key
     fallback_key = valid_keys[0]
     
-    if not keys_status["Map Key"]["valid"]:
-        print(f"[WARNING] settings.GEMINI_API_KEY_MAP is invalid/exhausted ({keys_status['Map Key']['error']}). Falling back to a valid key.")
+    if not keys_status.get("Map Key", {}).get("valid"):
+        print(f"[WARNING] settings.GEMINI_API_KEY_MAP is invalid/exhausted. Falling back to a valid key.")
         settings.GEMINI_API_KEY_MAP = fallback_key
         
-    if not keys_status["Reduce Key"]["valid"]:
-        print(f"[WARNING] settings.GEMINI_API_KEY_REDUCE is invalid/exhausted ({keys_status['Reduce Key']['error']}). Falling back to a valid key.")
+    if not keys_status.get("Reduce Key", {}).get("valid"):
+        print(f"[WARNING] settings.GEMINI_API_KEY_REDUCE is invalid/exhausted. Falling back to a valid key.")
         settings.GEMINI_API_KEY_REDUCE = fallback_key
         
-    if not keys_status["RAG Key"]["valid"]:
-        print(f"[WARNING] settings.GEMINI_API_KEY_RAG is invalid/exhausted ({keys_status['RAG Key']['error']}). Falling back to a valid key.")
+    if not keys_status.get("RAG Key", {}).get("valid"):
+        print(f"[WARNING] settings.GEMINI_API_KEY_RAG is invalid/exhausted. Falling back to a valid key.")
         settings.GEMINI_API_KEY_RAG = fallback_key
     
     # 1. Phase 1: Ingestion & Static Analysis (Run in a thread pool to avoid blocking the event loop)

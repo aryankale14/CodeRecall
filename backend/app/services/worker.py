@@ -60,6 +60,7 @@ async def task_a_generate_embedding(content: str) -> list[float]:
     Uses 'tenacity' to automatically retry if we hit Google's rate limits (HTTP 429).
     If the file is long, we chunk it, embed chunks, and average them into a single vector.
     """
+    embeddings_model.google_api_key = settings.GEMINI_API_KEY_RAG
     chunks = text_splitter.split_text(content)
     
     if not chunks:

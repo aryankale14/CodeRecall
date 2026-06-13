@@ -29,6 +29,7 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
     """
     
     # 1. Convert user's question into a vector
+    embeddings_model.google_api_key = settings.GEMINI_API_KEY_RAG
     question_vector = await embeddings_model.aembed_query(question)
     
     # 2. Perform Cosine Similarity Search in PostgreSQL
