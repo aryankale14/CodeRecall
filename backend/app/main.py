@@ -1,5 +1,6 @@
 import warnings
 import asyncio
+from datetime import datetime, timedelta, timezone
 # Suppress deprecation and future warnings in production logs
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -32,6 +33,16 @@ try:
         print("[INFO] Database migration: user_id column checked/created successfully.")
 except Exception as e:
     print(f"[WARNING] Database column alteration failed: {e}. If the column already exists, this is fine.")
+
+# Graceful light migration to add created_at column if it doesn't exist in PostgreSQL
+try:
+    with engine.connect() as conn:
+        from sqlalchemy import text
+        conn.execute(text("ALTER TABLE repository_files ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;"))
+        conn.commit()
+        print("[INFO] Database migration: created_at column checked/created successfully.")
+except Exception as e:
+    print(f"[WARNING] Database column alteration failed for created_at: {e}. If the column already exists, this is fine.")
 
 # Migrate local JSON user mappings to the database if the file exists
 try:
@@ -149,6 +160,25 @@ async def ingest_repo(
     """
     repo_url = request.repo_url
     user_id = current_user["uid"]
+    
+    # 12-hour rate limiting check for all users except the admin
+    user_email = current_user.get("email")
+    if user_email != "aryankale1410@gmail.com":
+        twelve_hours_ago = datetime.now(timezone.utc) - timedelta(hours=12)
+        
+        # Query distinct repository URLs scanned by this user in the last 12 hours
+        recent_repos = db.query(RepositoryFile.repo_url).filter(
+            RepositoryFile.user_id == user_id,
+            RepositoryFile.created_at >= twelve_hours_ago
+        ).distinct().all()
+        
+        recent_repos_list = [r[0] for r in recent_repos if r[0]]
+        
+        if len(recent_repos_list) >= 2 and repo_url not in recent_repos_list:
+            raise HTTPException(
+                status_code=400,
+                detail="Rate limit exceeded. Free tier users are limited to scanning 2 repositories every 12 hours."
+            )
     
     # Pre-verify all API keys (including role-specific fallbacks) to prevent starting a doomed ingestion.
     settings = get_settings()

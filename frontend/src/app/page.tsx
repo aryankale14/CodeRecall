@@ -558,7 +558,7 @@ export default function Home() {
         setRepoInput("");
         fetchReposHistory(user); // update history list
       } else {
-        setSubmitError(data.message || "Failed to submit repository url for analysis.");
+        setSubmitError(data.message || data.detail || "Failed to submit repository url for analysis.");
       }
     } catch (err) {
       setSubmitError("Failed to connect to the backend server. Please verify FastAPI is running.");
@@ -1250,6 +1250,10 @@ export default function Home() {
                     <span>Analyze Repository</span>
                     <ArrowRight size={16} />
                   </button>
+                </div>
+
+                <div className="text-[10px] text-secondary/60 flex items-center gap-1.5 px-1 mt-1 font-sans">
+                  <span>🔒 Rate limit: 2 repository scans per 12 hours (unlimited for admins)</span>
                 </div>
                 
                 {submitError && (

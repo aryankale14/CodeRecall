@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import Column, String, Text
+from sqlalchemy import Column, String, Text, DateTime
+from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from pgvector.sqlalchemy import Vector
 from app.database import Base
@@ -50,6 +51,9 @@ class RepositoryFile(Base):
 
     # The owner UID of the user who scanned this repository (Firebase UID)
     user_id = Column(String, default="mock_local_developer_uid", index=True)
+
+    # Ingestion timestamp used for rate-limiting
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 class UserMapping(Base):
