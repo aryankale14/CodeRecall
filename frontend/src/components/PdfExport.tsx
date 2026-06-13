@@ -186,6 +186,30 @@ export function generatePdf(report: RepoReport): void {
 
       // Check for code block boundary
       if (trimmedLine.startsWith("```")) {
+        if (!inCodeBlock) {
+          // We are entering a code block!
+          // Scan ahead to calculate total lines in this code block
+          let codeBlockLines = 0;
+          for (let i = p + 1; i < paragraphs.length; i++) {
+            if (paragraphs[i].trim().startsWith("```")) {
+              break;
+            }
+            codeBlockLines++;
+          }
+          
+          // Calculate code block height: 3.6mm per line + padding
+          const codeBlockHeight = codeBlockLines * 3.6 + 5;
+          const maxPrintableHeight = pageHeight - footerMargin - 25; // ~257mm
+          
+          // Page boundary check: if it won't fit on this page, and can fit on a fresh page, start a new page!
+          if (codeBlockHeight <= maxPrintableHeight && currentY + codeBlockHeight > pageHeight - footerMargin - 10) {
+            doc.addPage();
+            currentPageNum++;
+            drawHeaderFooter(doc, currentPageNum);
+            currentY = 25; // Top margin of new page
+          }
+        }
+        
         inCodeBlock = !inCodeBlock;
         continue; // Skip the delimiter line itself
       }
@@ -201,7 +225,7 @@ export function generatePdf(report: RepoReport): void {
 
         const codeLine = cleanCodeLine(rawLine.replace(/\r$/, ""));
         doc.setFont("courier", "normal");
-        doc.setFontSize(8.5);
+        doc.setFontSize(6.5);
         doc.setTextColor(31, 41, 55);
 
         const splitLines = codeLine ? doc.splitTextToSize(codeLine, contentWidth) : [""];
@@ -212,11 +236,11 @@ export function generatePdf(report: RepoReport): void {
             drawHeaderFooter(doc, currentPageNum);
             currentY = 25;
             doc.setFont("courier", "normal");
-            doc.setFontSize(8.5);
+            doc.setFontSize(6.5);
             doc.setTextColor(31, 41, 55);
           }
           doc.text(splitLines[i], marginX, currentY);
-          currentY += 4.5;
+          currentY += 3.6;
         }
         continue;
       }

@@ -90,7 +90,12 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
         Synthesize this information and write a comprehensive "Global Project Overview".
         Explain the overall architecture, what the project does, and how the main components interact.
         
-        YOU MUST COMPULSORILY include a detailed, clean visual ASCII flowchart diagram inside a code block (```text ... ```) at the end of your overview. Use simple boxes, lines, and arrows (like `[Component] ---> [Database]`) to map out the database schemas/interactions, key directories, API endpoints, and system logic flows of the project. The flowchart must be formatted neatly with monospaced characters to ensure it aligns perfectly when rendered in a monospaced font. Do not use Mermaid.js syntax.
+        YOU MUST COMPULSORILY include a detailed, comprehensive, and complete visual ASCII flowchart diagram inside a code block (```text ... ```) at the end of your overview. 
+        This diagram must map out the entire system architecture in detail, spanning three distinct layers:
+        1. CLIENT/FRONTEND LAYER: e.g. Next.js SPA client, including specific components like page.tsx, ChatPanel.tsx, CodeViewer.tsx, PdfExport.tsx, and state handling.
+        2. BACKEND LAYER: e.g. FastAPI backend core, including API gateways, Firebase Auth middleware, worker.py, rag.py, limiter.py, database.py, and models.py.
+        3. DATA/PERSISTENCE LAYER: e.g. PostgreSQL, Supabase, pgvector, and database tables (RepositoryFile, UserMapping, etc.).
+        Use box layouts with vertical/horizontal borders (using |, -, +, etc.) and arrows (--->, ===>, etc.) to detail components, data flows, and subsystem boundaries, just like a premium professional systems architecture flowchart. Make the diagram highly comprehensive, complete, and large, representing all major workflows and folders of the scanned repository. The flowchart must be formatted neatly with monospaced characters to ensure it aligns perfectly when rendered in a monospaced font. Do not use Mermaid.js syntax.
         
         FILE SUMMARIES:
         {all_summaries_text}
