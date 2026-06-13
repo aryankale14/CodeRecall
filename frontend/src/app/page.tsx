@@ -1253,7 +1253,7 @@ export default function Home() {
                 </div>
 
                 <div className="text-[10px] text-secondary/60 flex items-center gap-1.5 px-1 mt-1 font-sans">
-                  <span>🔒 Rate limit: 2 repository scans per 12 hours (unlimited for admins)</span>
+                  <span>🔒 Rate limit: 2 repos per 12 hours. Be gentle, our servers run on a hamster wheel 🐹</span>
                 </div>
                 
                 {submitError && (
