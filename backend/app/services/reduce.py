@@ -96,12 +96,15 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
         Synthesize this information and write a comprehensive "Global Project Overview".
         Explain the overall architecture, what the project does, and how the main components interact.
         
-        YOU MUST COMPULSORILY include a detailed, comprehensive, and complete visual ASCII flowchart diagram inside a code block (```text ... ```) at the end of your overview. 
-        This diagram must map out the entire system architecture in detail, spanning three distinct layers:
-        1. CLIENT/FRONTEND LAYER: e.g. Next.js SPA client, including specific components like page.tsx, ChatPanel.tsx, CodeViewer.tsx, PdfExport.tsx, and state handling.
-        2. BACKEND LAYER: e.g. FastAPI backend core, including API gateways, Firebase Auth middleware, worker.py, rag.py, limiter.py, database.py, and models.py.
-        3. DATA/PERSISTENCE LAYER: e.g. PostgreSQL, Supabase, pgvector, and database tables (RepositoryFile, UserMapping, etc.).
-        Use box layouts with vertical/horizontal borders (using |, -, +, etc.) and arrows (--->, ===>, etc.) to detail components, data flows, and subsystem boundaries, just like a premium professional systems architecture flowchart. Make the diagram highly comprehensive, complete, and large, representing all major workflows and folders of the scanned repository. The flowchart must be formatted neatly with monospaced characters to ensure it aligns perfectly when rendered in a monospaced font. Do not use Mermaid.js syntax.
+        YOU MUST COMPULSORILY include a clean, vertical systems architecture flowchart diagram inside a code block (```text ... ```) at the end of your overview.
+        
+        This diagram must strictly follow these formatting and structure guidelines to ensure readability:
+        1. VERTICAL FLOW: The overall flow of the diagram must go from TOP to BOTTOM (e.g. CLIENT/FRONTEND LAYER at the top -> BACKEND LAYER in the middle -> DATA/PERSISTENCE LAYER at the bottom).
+        2. HIGH-LEVEL COMPONENTS ONLY: Focus strictly on key high-level subsystems, main logic layers, and primary directories/modules.
+        3. OMIT ALL BOILERPLATE/CONFIGS: Absolutely DO NOT include configuration, compiler, build, dependency management, metadata, or environment files in the diagram. For example, OMIT files like index.html, tsconfig.json, package.json, vite.config.ts, webpack.config.js, eslint.config.mjs, next.config.ts, vercel.json, netlify.toml, .gitignore, .env, and other static configurations.
+        4. CLEAN ASCII LAYOUT: Use simple box layouts with clean ASCII borders (using |, -, +, etc.) and downwards pointing flow arrows (e.g., |, v, V, --->, ===>). Keep spacing balanced.
+        5. WIDTH CONSTRAINTS: The diagram must NOT exceed 90 characters in width. This ensures it aligns perfectly when rendered in a monospaced font and does not wrap or overflow on standard screens or PDF reports.
+        6. NO MERMAID: Do not write Mermaid.js syntax. Generate plain, raw, monospace-aligned ASCII text.
         
         FILE SUMMARIES:
         {all_summaries_text}
