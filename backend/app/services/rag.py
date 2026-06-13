@@ -70,7 +70,7 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
     for f in similar_files:
         # We cap the content length just in case a massive file was retrieved,
         # ensuring we stay well within the prompt limits for fast inference.
-        content_preview = f.content[:3000] + ("..." if len(f.content) > 3000 else "")
+        content_preview = f.content[:40000] + ("..." if len(f.content) > 40000 else "")
         context_blocks.append(f"--- File: {f.file_path} ---\n{content_preview}\n")
         
     context_text = "\n".join(context_blocks)
