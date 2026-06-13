@@ -78,7 +78,7 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
         return False
 
     # 3. Fire off the Master Explainer and Master Security Agent in parallel
-    # We use Gemini 1.5 Pro because it handles up to 2 Million tokens, 
+    # We use the configured settings.GEMINI_MODEL_REDUCE model (e.g. Gemini 3.5 Flash)
     # perfect for reading thousands of summaries at once!
     # Force the local client configuration to use the correct API key atomically
     genai.configure(api_key=settings.GEMINI_API_KEY_REDUCE)
