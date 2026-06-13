@@ -45,8 +45,8 @@ async def generate_content_with_fallback(model_name: str, prompt: str, response_
         elif "429" in str(e) or "quota" in str(e).lower() or "exhausted" in str(e).lower() or "limit" in str(e).lower():
             is_quota_error = True
             
-        if is_quota_error and model_name != "gemini-2.5-flash":
-            fallback_model = "gemini-2.5-flash"
+        if is_quota_error and model_name != "gemini-1.5-flash":
+            fallback_model = "gemini-1.5-flash"
             print(f"[WARNING] Quota limit hit for model {model_name}. Falling back to stable {fallback_model}...")
             
             # Wait a small delay to clear the rate-limiter and retry with fallback

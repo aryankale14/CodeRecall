@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import RepositoryFile
+from app.services.limiter import generate_content_with_fallback
 
 settings = get_settings()
 
@@ -77,8 +78,6 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
     # 5. Generate Answer using the Gemini Chat Model
     # Force the local client configuration to use the correct API key atomically
     genai.configure(api_key=settings.GEMINI_API_KEY_RAG)
-    model = genai.GenerativeModel(settings.GEMINI_MODEL_RAG)
-    model._client = genai_client.get_default_generative_client()
     
     prompt = f"""
     You are an expert AI Code Assistant. Answer the user's question about their codebase using the provided project overview and code context.
@@ -99,5 +98,5 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
         {context_text}
     """
 
-    response = await model.generate_content_async(prompt)
-    return response.text
+    answer = await generate_content_with_fallback(settings.GEMINI_MODEL_RAG, prompt)
+    return answer
