@@ -25,9 +25,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY_RAG: str = ""
     
     # Optional Fallback Keys: Used if any of the main keys are invalid or exhausted.
-    GEMINI_API_KEY_FALLBACK_1: str = ""
-    GEMINI_API_KEY_FALLBACK_2: str = ""
-    GEMINI_API_KEY_FALLBACK_3: str = ""
+    GEMINI_API_KEY_MAP_FALLBACK: str = ""
+    GEMINI_API_KEY_REDUCE_FALLBACK: str = ""
+    GEMINI_API_KEY_RAG_FALLBACK: str = ""
 
     # ---------------------------------------------------------
     # MODEL CONFIGURATIONS - Defaulting to latest GA models

@@ -150,53 +150,89 @@ async def ingest_repo(
     repo_url = request.repo_url
     user_id = current_user["uid"]
     
-    # Pre-verify all API keys (including optional fallbacks) to prevent starting a doomed ingestion.
-    # If some keys are exhausted/invalid, we fall back to any configured key that is valid to keep the service running.
+    # Pre-verify all API keys (including role-specific fallbacks) to prevent starting a doomed ingestion.
     settings = get_settings()
     
-    keys_status = {}
-    valid_keys = []
-    
-    candidate_keys = [
-        ("Map Key", settings.GEMINI_API_KEY_MAP),
-        ("Reduce Key", settings.GEMINI_API_KEY_REDUCE),
-        ("RAG Key", settings.GEMINI_API_KEY_RAG),
-        ("Fallback Key 1", settings.GEMINI_API_KEY_FALLBACK_1),
-        ("Fallback Key 2", settings.GEMINI_API_KEY_FALLBACK_2),
-        ("Fallback Key 3", settings.GEMINI_API_KEY_FALLBACK_3),
+    # We will build a pool of all valid keys so we can do a secondary fallback if both map/fallback fail.
+    all_keys = [
+        settings.GEMINI_API_KEY_MAP,
+        settings.GEMINI_API_KEY_MAP_FALLBACK,
+        settings.GEMINI_API_KEY_REDUCE,
+        settings.GEMINI_API_KEY_REDUCE_FALLBACK,
+        settings.GEMINI_API_KEY_RAG,
+        settings.GEMINI_API_KEY_RAG_FALLBACK
     ]
     
-    for name, key_val in candidate_keys:
-        if not key_val:
+    valid_key_pool = []
+    verified_status = {}
+    
+    # Unique non-empty keys to verify
+    for key in set(all_keys):
+        if not key:
             continue
-        err = await verify_gemini_key(key_val)
+        err = await verify_gemini_key(key)
+        verified_status[key] = {"valid": not err, "error": err}
         if not err:
-            valid_keys.append(key_val)
-            keys_status[name] = {"valid": True, "error": None}
-        else:
-            keys_status[name] = {"valid": False, "error": err}
-            
-    # If absolutely no keys are valid, we cannot proceed.
-    if not valid_keys:
-        err_msg = "All configured Gemini API Keys (including fallbacks) are invalid or exhausted:\n"
-        for name, status in keys_status.items():
-            err_msg += f"- {name}: {status['error']}\n"
+            valid_key_pool.append(key)
+                
+    if not valid_key_pool:
+        # Build comprehensive error logs
+        err_msg = "All configured Gemini API keys (including fallbacks) are invalid or exhausted.\n"
+        # We list status of main keys
+        for name, key_val in [
+            ("Map Key", settings.GEMINI_API_KEY_MAP),
+            ("Map Fallback", settings.GEMINI_API_KEY_MAP_FALLBACK),
+            ("Reduce Key", settings.GEMINI_API_KEY_REDUCE),
+            ("Reduce Fallback", settings.GEMINI_API_KEY_REDUCE_FALLBACK),
+            ("RAG Key", settings.GEMINI_API_KEY_RAG),
+            ("RAG Fallback", settings.GEMINI_API_KEY_RAG_FALLBACK)
+        ]:
+            if key_val:
+                status = verified_status.get(key_val, {}).get("error", "Unknown validation error")
+                err_msg += f"- {name}: {status}\n"
+            else:
+                err_msg += f"- {name}: Missing/empty key\n"
         return {"status": "error", "message": err_msg}
         
-    # Dynamically map invalid/exhausted keys to the first valid key
-    fallback_key = valid_keys[0]
-    
-    if not keys_status.get("Map Key", {}).get("valid"):
-        print(f"[WARNING] settings.GEMINI_API_KEY_MAP is invalid/exhausted. Falling back to a valid key.")
-        settings.GEMINI_API_KEY_MAP = fallback_key
+    # Helper to check if a specific key is valid
+    def is_valid(key: str) -> bool:
+        return key in verified_status and verified_status[key]["valid"]
         
-    if not keys_status.get("Reduce Key", {}).get("valid"):
-        print(f"[WARNING] settings.GEMINI_API_KEY_REDUCE is invalid/exhausted. Falling back to a valid key.")
-        settings.GEMINI_API_KEY_REDUCE = fallback_key
+    # 2. Map Key Resolution
+    if is_valid(settings.GEMINI_API_KEY_MAP):
+        pass
+    elif is_valid(settings.GEMINI_API_KEY_MAP_FALLBACK):
+        print("[FALLBACK] Map Key failed. Using GEMINI_API_KEY_MAP_FALLBACK with gemini-2.5-flash.")
+        settings.GEMINI_API_KEY_MAP = settings.GEMINI_API_KEY_MAP_FALLBACK
+        settings.GEMINI_MODEL_MAP = "gemini-2.5-flash"
+    else:
+        print("[WARNING] Both Map Key and its Fallback failed! Using the first valid key in the pool.")
+        settings.GEMINI_API_KEY_MAP = valid_key_pool[0]
+        settings.GEMINI_MODEL_MAP = "gemini-2.5-flash"
         
-    if not keys_status.get("RAG Key", {}).get("valid"):
-        print(f"[WARNING] settings.GEMINI_API_KEY_RAG is invalid/exhausted. Falling back to a valid key.")
-        settings.GEMINI_API_KEY_RAG = fallback_key
+    # 3. Reduce Key Resolution
+    if is_valid(settings.GEMINI_API_KEY_REDUCE):
+        pass
+    elif is_valid(settings.GEMINI_API_KEY_REDUCE_FALLBACK):
+        print("[FALLBACK] Reduce Key failed. Using GEMINI_API_KEY_REDUCE_FALLBACK with gemini-2.5-flash.")
+        settings.GEMINI_API_KEY_REDUCE = settings.GEMINI_API_KEY_REDUCE_FALLBACK
+        settings.GEMINI_MODEL_REDUCE = "gemini-2.5-flash"
+    else:
+        print("[WARNING] Both Reduce Key and its Fallback failed! Using the first valid key in the pool.")
+        settings.GEMINI_API_KEY_REDUCE = valid_key_pool[0]
+        settings.GEMINI_MODEL_REDUCE = "gemini-2.5-flash"
+        
+    # 4. RAG Key Resolution
+    if is_valid(settings.GEMINI_API_KEY_RAG):
+        pass
+    elif is_valid(settings.GEMINI_API_KEY_RAG_FALLBACK):
+        print("[FALLBACK] RAG Key failed. Using GEMINI_API_KEY_RAG_FALLBACK with gemini-2.5-flash.")
+        settings.GEMINI_API_KEY_RAG = settings.GEMINI_API_KEY_RAG_FALLBACK
+        settings.GEMINI_MODEL_RAG = "gemini-2.5-flash"
+    else:
+        print("[WARNING] Both RAG Key and its Fallback failed! Using the first valid key in the pool.")
+        settings.GEMINI_API_KEY_RAG = valid_key_pool[0]
+        settings.GEMINI_MODEL_RAG = "gemini-2.5-flash"
     
     # 1. Phase 1: Ingestion & Static Analysis (Run in a thread pool to avoid blocking the event loop)
     # This clones the repo, filters files, and saves pending files to DB.
