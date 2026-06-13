@@ -63,16 +63,29 @@ async def task_a_generate_embedding(content: str) -> list[float]:
     embeddings_model.google_api_key = settings.GEMINI_API_KEY_RAG
     chunks = text_splitter.split_text(content)
     
-    if not chunks:
-        # Fallback if the file was somehow completely empty of text
-        return await embeddings_model.aembed_query("Empty file")
-        
-    # Get embeddings for all chunks concurrently using asyncio.gather.
-    # The text-embedding-004 model supports up to 1,500 Requests Per Minute (RPM) on the free tier,
-    # so we can safely execute chunk embeddings in parallel for maximum speed.
-    chunk_embeddings = await asyncio.gather(*[
-        embeddings_model.aembed_query(chunk) for chunk in chunks
-    ])
+    async def run_embedding():
+        if not chunks:
+            # Fallback if the file was somehow completely empty of text
+            return await embeddings_model.aembed_query("Empty file")
+        return await asyncio.gather(*[
+            embeddings_model.aembed_query(chunk) for chunk in chunks
+        ])
+
+    try:
+        chunk_embeddings = await run_embedding()
+    except Exception as e:
+        err_str = str(e).upper()
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str:
+            if settings.GEMINI_API_KEY_RAG_FALLBACK and settings.GEMINI_API_KEY_RAG != settings.GEMINI_API_KEY_RAG_FALLBACK:
+                print("[DYNAMIC FALLBACK] RAG embedding key exhausted during run. Switching to RAG Fallback Key in memory.")
+                settings.GEMINI_API_KEY_RAG = settings.GEMINI_API_KEY_RAG_FALLBACK
+                embeddings_model.google_api_key = settings.GEMINI_API_KEY_RAG
+                # Retry once after switching
+                chunk_embeddings = await run_embedding()
+            else:
+                raise e
+        else:
+            raise e
     
     # If it's a single chunk, just return its vector
     if len(chunk_embeddings) == 1:
@@ -126,12 +139,31 @@ async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, l
     # Space out requests to avoid 429 rate limit issues
     await space_request()
 
-    # Generate content using the fallback-safe helper
-    response_text = await generate_content_with_fallback(
-        model_name=model_name,
-        prompt=prompt,
-        response_mime_type="application/json"
-    )
+    try:
+        # Generate content using the fallback-safe helper
+        response_text = await generate_content_with_fallback(
+            model_name=model_name,
+            prompt=prompt,
+            response_mime_type="application/json"
+        )
+    except Exception as e:
+        err_str = str(e).upper()
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str:
+            if settings.GEMINI_API_KEY_MAP_FALLBACK and settings.GEMINI_API_KEY_MAP != settings.GEMINI_API_KEY_MAP_FALLBACK:
+                print("[DYNAMIC FALLBACK] Map key exhausted during run. Switching to Map Fallback Key and gemini-2.5-flash in memory.")
+                settings.GEMINI_API_KEY_MAP = settings.GEMINI_API_KEY_MAP_FALLBACK
+                settings.GEMINI_MODEL_MAP = "gemini-2.5-flash"
+                genai.configure(api_key=settings.GEMINI_API_KEY_MAP)
+                # Retry once after switching
+                response_text = await generate_content_with_fallback(
+                    model_name="gemini-2.5-flash",
+                    prompt=prompt,
+                    response_mime_type="application/json"
+                )
+            else:
+                raise e
+        else:
+            raise e
     
     try:
         # Parse the clean JSON response directly
@@ -141,7 +173,7 @@ async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, l
         return summary, vulnerabilities
     except json.JSONDecodeError:
         # Fallback if the LLM hallucinated outside the JSON schema
-        return {"summary": "Failed to parse LLM response.", "raw": response.text}, []
+        return {"summary": "Failed to parse LLM response.", "raw": response_text}, []
 
 async def process_single_file(file_id: str, semaphore: asyncio.Semaphore, repo_url: str = ""):
     """
