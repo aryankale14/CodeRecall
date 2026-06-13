@@ -1230,7 +1230,7 @@ export default function Home() {
               Submit a GitHub repository URL below. Our system shallow-clones, runs static defense analyzers, chunks vector embeddings, and builds a comprehensive architectural and security blueprint.
             </p>
 
-            <form onSubmit={handleIngestSubmit} className="w-full glass-panel p-6 bg-white/[0.02] glow-active mb-8">
+            <form onSubmit={handleIngestSubmit} className="w-full glass-panel p-6 bg-white/[0.02] glow-active mb-4">
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col md:flex-row gap-3">
                   <input
@@ -1251,10 +1251,6 @@ export default function Home() {
                     <ArrowRight size={16} />
                   </button>
                 </div>
-
-                <div className="text-[10px] text-secondary/60 flex items-center gap-1.5 px-1 mt-1 font-sans">
-                  <span>🔒 Rate limit: 2 repos per 12 hours. Be gentle, our servers run on a hamster wheel 🐹</span>
-                </div>
                 
                 {submitError && (
                   <div className="text-xs text-rose-400 mt-2 flex items-center gap-1.5">
@@ -1264,6 +1260,10 @@ export default function Home() {
                 )}
               </div>
             </form>
+
+            <div className="text-[11px] text-secondary/60 flex items-center justify-center gap-1.5 mb-8 font-sans px-4 py-1.5 rounded-full bg-black/[0.02] dark:bg-white/[0.01] border border-black/5 dark:border-white/5 shadow-sm max-w-max mx-auto">
+              <span>🔒 Rate limit: 2 repos per 12 hours. Be gentle, our servers run on a hamster wheel 🐹</span>
+            </div>
 
 
 
@@ -1375,12 +1375,15 @@ export default function Home() {
                     />
                   </div>
                   {pipelineStatus.total_files > 0 && 
-                   (pipelineStatus.completed_files + pipelineStatus.error_files === pipelineStatus.total_files) && 
                    pipelineStatus.status === "processing" && (
                     <div className="reduce-excuse-banner">
                       <RefreshCw size={14} className="excuse-icon animate-spin" />
                       <span className="excuse-text">
-                        {FUNNY_EXCUSES[funnyExcuseIdx]}
+                        {pipelineStatus.completed_files + pipelineStatus.error_files === pipelineStatus.total_files ? (
+                          FUNNY_EXCUSES[funnyExcuseIdx]
+                        ) : (
+                          "🔍 Mapping codebase: chunking code, extracting summaries, and generating vector embeddings... ⚡"
+                        )}
                       </span>
                     </div>
                   )}
@@ -1413,29 +1416,29 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* INDIVIDUAL FAILED FILES DETAILS PANEL */}
-              {pipelineStatus.files && pipelineStatus.files.some(f => f.status === "error") && (
-                <div className="mt-6 text-left border border-rose-500/20 bg-rose-950/20 rounded-lg p-4">
-                  <div className="text-[10px] text-rose-400 uppercase font-bold tracking-wider mb-2 flex items-center gap-1.5 px-1">
-                    <XCircle size={10} className="text-rose-400" />
-                    <span>Failed Files Details</span>
-                  </div>
-                  <div className="max-h-[150px] overflow-y-auto scrollbar space-y-2 pr-1">
-                    {pipelineStatus.files
-                      .filter(f => f.status === "error")
-                      .map((f, idx) => (
-                        <div key={idx} className="text-left text-xs bg-black/40 rounded p-2 border border-rose-500/20">
-                          <div className="font-semibold text-rose-300 truncate font-mono text-[11px]" title={f.file_path}>
-                            {f.file_path}
-                          </div>
-                          <div className="text-[10px] text-secondary mt-1 leading-normal break-words">
-                            {f.error || "Unknown analysis error."}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
+                  {/* INDIVIDUAL FAILED FILES DETAILS PANEL */}
+                  {pipelineStatus.files && pipelineStatus.files.some(f => f.status === "error") && (
+                    <div className="mt-6 text-left border border-rose-200 dark:border-rose-500/20 bg-rose-500/5 dark:bg-rose-950/20 rounded-lg p-4">
+                      <div className="text-[10px] text-rose-700 dark:text-rose-400 uppercase font-bold tracking-wider mb-2 flex items-center gap-1.5 px-1">
+                        <XCircle size={10} className="text-rose-700 dark:text-rose-400" />
+                        <span>Failed Files Details</span>
+                      </div>
+                      <div className="max-h-[150px] overflow-y-auto scrollbar space-y-2 pr-1">
+                        {pipelineStatus.files
+                          .filter(f => f.status === "error")
+                          .map((f, idx) => (
+                            <div key={idx} className="text-left text-xs bg-rose-50/60 dark:bg-black/40 rounded p-2 border border-rose-200/40 dark:border-rose-500/20">
+                              <div className="font-semibold text-rose-700 dark:text-rose-300 truncate font-mono text-[11px]" title={f.file_path}>
+                                {f.file_path}
+                              </div>
+                              <div className="text-[10px] text-secondary mt-1 leading-normal truncate" title={f.error || "Unknown analysis error."}>
+                                {f.error || "Unknown analysis error."}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
 
               {pipelineStatus.status === "error" ? (
                 <p className="text-[11px] text-rose-400 mt-6 max-w-xs mx-auto leading-normal font-semibold">
