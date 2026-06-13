@@ -69,6 +69,12 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
             return exception.code in (429, 500, 503, 504)
         if isinstance(exception, (asyncio.TimeoutError, ConnectionError, IOError)):
             return True
+        
+        # Check string representation for rate limits in wrapped exceptions
+        err_str = str(exception).upper()
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str or "500" in err_str or "503" in err_str:
+            return True
+            
         return False
 
     # 3. Fire off the Master Explainer and Master Security Agent in parallel

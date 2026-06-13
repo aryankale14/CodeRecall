@@ -46,6 +46,12 @@ def is_transient_error(exception):
         return exception.code in (429, 500, 503, 504)
     if isinstance(exception, (asyncio.TimeoutError, ConnectionError, IOError)):
         return True
+    
+    # Check string representation for rate limits in wrapped exceptions (e.g. LangChain wrappers)
+    err_str = str(exception).upper()
+    if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str or "500" in err_str or "503" in err_str:
+        return True
+        
     return False
 
 @retry(
@@ -62,6 +68,9 @@ async def task_a_generate_embedding(content: str) -> list[float]:
     """
     embeddings_model.google_api_key = settings.GEMINI_API_KEY_RAG
     chunks = text_splitter.split_text(content)
+    
+    # Space out embedding requests to avoid hitting rate limits
+    await space_request(min_interval=2.0)
     
     async def run_embedding():
         if not chunks:
