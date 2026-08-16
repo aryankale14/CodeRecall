@@ -184,17 +184,22 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
-  background-color: var(--bg-deep);
   color: var(--text-primary);
   font-family: var(--font-sans);
   min-height: 100vh;
 }
 
 html {
+  /* The page colour lives on <html> so it paints the canvas beneath
+     everything, including the fixed backdrop layer below. */
+  background-color: var(--bg-deep);
   scroll-behavior: smooth;
 }
 
 body {
+  /* Must stay transparent: an opaque background here would paint over the
+     z-index:-1 backdrop layer and hide it entirely. */
+  background-color: transparent;
   /* Crisper glyphs and no synthetic-weight shimmer during transforms. */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -3268,22 +3273,22 @@ h2, h3, h4 {
    --------------------------------------------------------- */
 
 /*
- * Scrolling an inner panel to its end used to hand the remaining momentum to
+ * Scrolling the log panel to its end used to hand the remaining momentum to
  * the page behind it, so the whole layout lurched. `contain` stops the chain
  * at the panel edge.
- */
-.scrollbar,
-.live-terminal,
-.tabs-container {
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-/*
- * Keep the terminal's newest line pinned while entries stream in, without the
- * layout shifting as the list grows.
+ *
+ * Deliberately scoped to .live-terminal only. `.scrollbar` is a styling hook
+ * for the webkit scrollbar appearance and is applied to elements that do not
+ * scroll - including <main>, which is `overflow-hidden`. Because
+ * `overflow: hidden` still makes an element a scroll container,
+ * overscroll-behavior there swallows wheel events instead of letting them
+ * chain to the ancestor that actually scrolls, which kills wheel scrolling
+ * for the whole workspace.
  */
 .live-terminal {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* Keep the newest line pinned as entries stream in. */
   overflow-anchor: auto;
 }
 
