@@ -163,26 +163,42 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         )
 
     token = credentials.credentials
-
-    # If the token is the mock token, bypass verification!
-    if token == "mock_local_developer_token":
-        print("[MOCK AUTH] Verifying Bearer Token locally (Mock Token bypass active)...")
-        return {
-            "uid": "mock_local_developer_uid",
-            "email": "developer@coderecall.local",
-            "name": "Local Developer"
-        }
-
-    # If Firebase is not initialized, run in Graceful Local Mock Development mode
-    if not firebase_initialized:
-        print("[MOCK AUTH] Verifying Bearer Token locally (Mock Mode active)...")
-        return {
-            "uid": "mock_local_developer_uid",
-            "email": "developer@coderecall.local",
-            "name": "Local Developer"
-        }
-
     settings = get_settings()
+
+    # The fixed development token authenticates without any signature check, so
+    # it is only honoured when explicitly enabled via ALLOW_MOCK_AUTH. It used
+    # to be accepted unconditionally, which meant anyone who sent this exact
+    # string was logged in as a real account on the deployed backend.
+    if token == "mock_local_developer_token":
+        if not settings.ALLOW_MOCK_AUTH:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Mock authentication is disabled on this server.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        print("[MOCK AUTH] Mock token accepted (ALLOW_MOCK_AUTH is enabled).")
+        return {
+            "uid": "mock_local_developer_uid",
+            "email": "developer@coderecall.local",
+            "name": "Local Developer"
+        }
+
+    # Firebase failing to initialise must not silently disable authentication.
+    # Previously this branch accepted ANY token as the mock developer, so a
+    # transient startup failure turned the whole API into an open endpoint.
+    if not firebase_initialized:
+        if settings.ALLOW_MOCK_AUTH:
+            print("[MOCK AUTH] Firebase unavailable; ALLOW_MOCK_AUTH is enabled.")
+            return {
+                "uid": "mock_local_developer_uid",
+                "email": "developer@coderecall.local",
+                "name": "Local Developer"
+            }
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication backend is unavailable. Please try again shortly.",
+        )
+
     project_id = settings.FIREBASE_PROJECT_ID or "code-reviewer-9019f"
 
     # Try standard verification first ONLY if we have a service account credential

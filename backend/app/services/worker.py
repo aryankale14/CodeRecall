@@ -1,36 +1,20 @@
 import json
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
-import google.generativeai as genai
-import google.generativeai.client as genai_client
 from google.api_core.exceptions import GoogleAPICallError, InvalidArgument, PermissionDenied, NotFound
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.config import get_settings
 from app.database import SessionLocal
 from app.models import RepositoryFile
 from app.pipeline_logs import add_pipeline_log
-from app.services.limiter import space_request, generate_content_with_fallback
+from app.services.gemini_pool import AllKeysExhausted, MAX_EMBED_BATCH, get_pool
+from app.services.limiter import generate_content_with_fallback
 
 settings = get_settings()
 
-# ---------------------------------------------------------
-# SETUP LLM CLIENTS WITH SPECIFIC API KEYS
-# ---------------------------------------------------------
-
-# Map Phase Key for the Worker LLM (Task B)
-genai.configure(api_key=settings.GEMINI_API_KEY_MAP)
-
-# RAG Key for Embeddings (Task A)
-# We initialize the LangChain embedding model here. 
-embeddings_model = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-2", 
-    google_api_key=settings.GEMINI_API_KEY_RAG
-)
-
 # Tier 3 Defense: We use a text splitter for massive files to prevent embedding models from failing.
-# text-embedding-004 handles up to roughly 8192 tokens. We use a safe chunk size of 4000 characters.
+# gemini-embedding-2 handles up to roughly 8192 tokens. We use a safe chunk size of 4000 characters.
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
 
 # ---------------------------------------------------------
@@ -38,71 +22,65 @@ text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=20
 # ---------------------------------------------------------
 
 def is_transient_error(exception):
+    """
+    Decide whether tenacity should retry.
+
+    Quota errors are deliberately excluded: GeminiPool already rotates keys and
+    steps down models for those, so retrying here would re-run a call the pool
+    has already established has nowhere left to go. The old version retried
+    every 429 five times per file, which is what turned a single exhausted key
+    into hundreds of wasted requests.
+    """
+    if isinstance(exception, AllKeysExhausted):
+        return False
     # Do not retry if it's InvalidArgument (400), PermissionDenied (403), or NotFound (404)
     if isinstance(exception, (InvalidArgument, PermissionDenied, NotFound)):
         return False
-    # Only retry on 429, 500, 503, 504 or network/timeout issues
+    # Only retry genuine server/network faults
     if isinstance(exception, GoogleAPICallError):
-        return exception.code in (429, 500, 503, 504)
+        return exception.code in (500, 503, 504)
     if isinstance(exception, (asyncio.TimeoutError, ConnectionError, IOError)):
         return True
-    
-    # Check string representation for rate limits in wrapped exceptions (e.g. LangChain wrappers)
+
     err_str = str(exception).upper()
-    if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str or "500" in err_str or "503" in err_str:
+    if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str:
+        return False
+    if "500" in err_str or "503" in err_str:
         return True
-        
+
     return False
 
 @retry(
     retry=retry_if_exception(is_transient_error),
-    stop=stop_after_attempt(5),
+    stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True
 )
 async def task_a_generate_embedding(content: str) -> list[float]:
     """
-    Task A: Generates the vector embedding for the file using Key 3.
-    Uses 'tenacity' to automatically retry if we hit Google's rate limits (HTTP 429).
-    If the file is long, we chunk it, embed chunks, and average them into a single vector.
-    """
-    embeddings_model.google_api_key = settings.GEMINI_API_KEY_RAG
-    chunks = text_splitter.split_text(content)
-    
-    # Space out embedding requests to avoid hitting rate limits
-    await space_request(min_interval=2.0)
-    
-    async def run_embedding():
-        if not chunks:
-            # Fallback if the file was somehow completely empty of text
-            return await embeddings_model.aembed_query("Empty file")
-        return await asyncio.gather(*[
-            embeddings_model.aembed_query(chunk) for chunk in chunks
-        ])
+    Task A: Generates the vector embedding for the file.
 
-    try:
-        chunk_embeddings = await run_embedding()
-    except Exception as e:
-        err_str = str(e).upper()
-        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str:
-            if settings.GEMINI_API_KEY_RAG_FALLBACK and settings.GEMINI_API_KEY_RAG != settings.GEMINI_API_KEY_RAG_FALLBACK:
-                print("[DYNAMIC FALLBACK] RAG embedding key exhausted during run. Switching to RAG Fallback Key in memory.")
-                settings.GEMINI_API_KEY_RAG = settings.GEMINI_API_KEY_RAG_FALLBACK
-                embeddings_model.google_api_key = settings.GEMINI_API_KEY_RAG
-                # Retry once after switching
-                chunk_embeddings = await run_embedding()
-            else:
-                raise e
-        else:
-            raise e
-    
+    The chunks of a file are embedded in a SINGLE batched request. The previous
+    version fired one request per chunk via asyncio.gather, so a 40 KB file cost
+    ten requests against the daily quota instead of one - and the concurrent
+    gather also sidestepped the rate limiter it had just awaited.
+    """
+    chunks = text_splitter.split_text(content) or ["Empty file"]
+
+    # One batch is one request, so cap at the batch ceiling to keep the cost of
+    # any single file fixed at exactly one embedding call.
+    if len(chunks) > MAX_EMBED_BATCH:
+        chunks = chunks[:MAX_EMBED_BATCH]
+
+    chunk_embeddings = await get_pool().embed(chunks)
+
     # If it's a single chunk, just return its vector
     if len(chunk_embeddings) == 1:
         return chunk_embeddings[0]
-        
+
     # If multiple chunks, calculate the mean vector (average embedding).
-    # This represents the "average meaning" of the entire large file, 
-    # fitting perfectly into our single Vector(768) database column.
+    # This represents the "average meaning" of the entire large file,
+    # fitting perfectly into our single Vector(3072) database column.
     num_dimensions = len(chunk_embeddings[0])
     mean_vector = [
         sum(embedding[i] for embedding in chunk_embeddings) / len(chunk_embeddings)
@@ -112,18 +90,17 @@ async def task_a_generate_embedding(content: str) -> list[float]:
 
 @retry(
     retry=retry_if_exception(is_transient_error),
-    stop=stop_after_attempt(5),
+    stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True
 )
 async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, list]:
     """
-    Task B: Uses the Worker LLM (Key 1) to generate a strict JSON summary and vulnerability list.
+    Task B: Uses the Worker LLM to generate a strict JSON summary and vulnerability list.
+    Key selection and quota rotation are handled by GeminiPool.
     """
-    # Force the local client configuration to use the correct API key atomically
-    genai.configure(api_key=settings.GEMINI_API_KEY_MAP)
     model_name = settings.GEMINI_MODEL_MAP
-    
+
     prompt = f"""
     You are an expert Code Reviewer and Security Auditor.
     Analyze the following code from the file: `{file_path}`
@@ -145,35 +122,13 @@ async def task_b_generate_summary(file_path: str, content: str) -> tuple[dict, l
     ```
     """
     
-    # Space out requests to avoid 429 rate limit issues
-    await space_request()
+    # The pool paces each key independently and rotates on quota errors.
+    response_text = await generate_content_with_fallback(
+        model_name=model_name,
+        prompt=prompt,
+        response_mime_type="application/json"
+    )
 
-    try:
-        # Generate content using the fallback-safe helper
-        response_text = await generate_content_with_fallback(
-            model_name=model_name,
-            prompt=prompt,
-            response_mime_type="application/json"
-        )
-    except Exception as e:
-        err_str = str(e).upper()
-        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str:
-            if settings.GEMINI_API_KEY_MAP_FALLBACK and settings.GEMINI_API_KEY_MAP != settings.GEMINI_API_KEY_MAP_FALLBACK:
-                print("[DYNAMIC FALLBACK] Map key exhausted during run. Switching to Map Fallback Key and gemini-3.1-flash-lite in memory.")
-                settings.GEMINI_API_KEY_MAP = settings.GEMINI_API_KEY_MAP_FALLBACK
-                settings.GEMINI_MODEL_MAP = "gemini-3.1-flash-lite"
-                genai.configure(api_key=settings.GEMINI_API_KEY_MAP)
-                # Retry once after switching
-                response_text = await generate_content_with_fallback(
-                    model_name="gemini-3.1-flash-lite",
-                    prompt=prompt,
-                    response_mime_type="application/json"
-                )
-            else:
-                raise e
-        else:
-            raise e
-    
     try:
         # Parse the clean JSON response directly
         result = json.loads(response_text)
@@ -204,7 +159,11 @@ async def process_single_file(file_id: str, semaphore: asyncio.Semaphore, repo_u
                 db_file.status = "completed"
                 db_file.explanation_summary = {"summary": "Empty file."}
                 db_file.vulnerabilities_found = []
-                db_file.embedding = [0.0] * 3072
+                # Leave the embedding NULL. A zero vector has no direction, so
+                # pgvector's cosine distance against it is NaN, which makes the
+                # RAG ORDER BY nondeterministic. The retrieval query already
+                # filters on embedding IS NOT NULL.
+                db_file.embedding = None
                 db.commit()
                 return
             
@@ -255,11 +214,11 @@ async def process_single_file(file_id: str, semaphore: asyncio.Semaphore, repo_u
         except Exception as e:
             # Step 4: Handle any exceptions (LLM rate limits, network timeouts, etc.)
             print(f"[ERROR] Map Phase Error for {file_id}: {str(e)}")
-            
+
             # Log the actual file path instead of the UUID to make errors clear to the user
             friendly_name = file_path if file_path else file_id[:8]
             add_pipeline_log(repo_url, f"✗ Error analyzing file {friendly_name}: {str(e)[:120]}")
-            
+
             # Open a fresh session to mark the file as error, ensuring we don't hold connections
             db = SessionLocal()
             try:
@@ -274,19 +233,33 @@ async def process_single_file(file_id: str, semaphore: asyncio.Semaphore, repo_u
             finally:
                 db.close()
 
-        # File analysis finished, moving to next file immediately since space_request handles rate limits.
-        pass
+            # Once every key is spent there is nothing left to try, so stop the
+            # run rather than marching the remaining files through the same
+            # doomed calls. The caller keeps whatever completed so far.
+            if isinstance(e, AllKeysExhausted):
+                raise
 
 async def trigger_map_phase(file_ids: list[str], repo_url: str = ""):
     """
-    The entry point called by the FastAPI route as a Background Task. 
+    The entry point called by the FastAPI route as a Background Task.
     It processes all pending files sequentially using a Semaphore to prevent concurrent execution
     and stays within Gemini API rate limits.
     """
     semaphore = asyncio.Semaphore(1)
-    
+
     # Process each file one by one sequentially
-    for file_id in file_ids:
-        await process_single_file(file_id, semaphore, repo_url)
-        
+    for index, file_id in enumerate(file_ids):
+        try:
+            await process_single_file(file_id, semaphore, repo_url)
+        except AllKeysExhausted as e:
+            remaining = len(file_ids) - index - 1
+            print(f"[ABORT] Map Phase stopped: {e}")
+            add_pipeline_log(
+                repo_url,
+                f"✗ Daily Gemini quota exhausted on every key. Stopped with "
+                f"{remaining} file(s) unanalysed - the report will cover what "
+                f"finished. Quota resets at midnight Pacific."
+            )
+            break
+
     print("[DONE] Map Phase complete for all submitted files! Ready for Reduce Phase.")

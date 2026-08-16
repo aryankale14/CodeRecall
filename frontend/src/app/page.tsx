@@ -212,6 +212,10 @@ export default function Home() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Raw JSON of the last poll, so an unchanged response does not trigger a
+  // state update (and therefore no re-render and no terminal scroll jump).
+  const lastStatusJsonRef = useRef<string>("");
+  const lastLogsJsonRef = useRef<string>("");
 
   // 1. Initial Load: Fetch Repository History
   const fetchReposHistory = async (currentUser: User | null = user) => {
@@ -373,29 +377,41 @@ export default function Home() {
     
     setIsPolling(true);
     setPipelineLogs([]); // Reset log buffer when starting polling
-    
+    lastStatusJsonRef.current = "";
+    lastLogsJsonRef.current = "";
+
     const poll = async () => {
       try {
         const token = await getIdToken(user);
-        const res = await fetch(`${BACKEND_URL}/api/repo/status?repo_url=${encodeURIComponent(repoUrl)}`, {
-          headers: {
-            "Authorization": token ? `Bearer ${token}` : ""
+        const authHeaders = { "Authorization": token ? `Bearer ${token}` : "" };
+
+        // Both requests are independent, so issue them together instead of
+        // waiting for status before asking for logs.
+        const [res, resLogs] = await Promise.all([
+          fetch(`${BACKEND_URL}/api/repo/status?repo_url=${encodeURIComponent(repoUrl)}`, { headers: authHeaders }),
+          fetch(`${BACKEND_URL}/api/repo/logs?repo_url=${encodeURIComponent(repoUrl)}`, { headers: authHeaders }),
+        ]);
+
+        const [statusText, logsText] = await Promise.all([res.text(), resLogs.text()]);
+        const statusData: Repository = JSON.parse(statusText);
+
+        // Only commit state when the payload actually differs. Previously every
+        // tick replaced these objects, re-rendering the file list and re-firing
+        // the terminal auto-scroll even when nothing had changed.
+        if (statusText !== lastStatusJsonRef.current) {
+          lastStatusJsonRef.current = statusText;
+          setPipelineStatus(statusData);
+          setRepos((prev) =>
+            prev.map((r) => (r.repo_url === repoUrl ? { ...r, ...statusData } : r))
+          );
+        }
+
+        if (logsText !== lastLogsJsonRef.current) {
+          lastLogsJsonRef.current = logsText;
+          const logsData = JSON.parse(logsText);
+          if (Array.isArray(logsData)) {
+            setPipelineLogs(logsData);
           }
-        });
-        const statusData: Repository = await res.json();
-        
-        setPipelineStatus(statusData);
-
-        // Update in history list
-        setRepos((prev) =>
-          prev.map((r) => (r.repo_url === repoUrl ? { ...r, ...statusData } : r))
-        );
-
-        // Streaming pipeline logs polling
-        const resLogs = await fetch(`${BACKEND_URL}/api/repo/logs?repo_url=${encodeURIComponent(repoUrl)}`);
-        const logsData = await resLogs.json();
-        if (Array.isArray(logsData)) {
-          setPipelineLogs(logsData);
         }
 
         if (statusData.has_report) {
@@ -455,11 +471,21 @@ export default function Home() {
     return () => stopStatusPolling();
   }, []);
 
-  // Auto-scroll pipeline terminal (non-disruptive for mobile viewports)
+  // Auto-scroll pipeline terminal (non-disruptive for mobile viewports).
+  // Only follows the tail when the user is already near the bottom, so
+  // scrolling up to read an earlier line no longer yanks you back down.
   useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-    }
+    const el = terminalRef.current;
+    if (!el) return;
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom > 80) return;
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
   }, [pipelineLogs]);
 
   // Handle repository deletion

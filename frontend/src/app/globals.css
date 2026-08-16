@@ -87,8 +87,18 @@
   --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
-.dark body {
-  background-image: 
+/*
+ * Dark backdrop lives on the same composited layer as the light one.
+ *
+ * Note: background-size stays at the inherited 32px tile so dark mode renders
+ * exactly as it does today. These radial gradients were already being tiled at
+ * 32px rather than filling the viewport - almost certainly unintended, but
+ * changing it here would alter the look, which is out of scope for a
+ * smoothness pass.
+ */
+.dark body::before {
+  background-color: var(--bg-deep);
+  background-image:
     radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
     radial-gradient(circle at 90% 80%, rgba(217, 70, 239, 0.05) 0%, transparent 40%),
     radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.03) 0%, transparent 60%) !important;
@@ -177,12 +187,42 @@ body {
   background-color: var(--bg-deep);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  background-image: 
+  min-height: 100vh;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  /* Crisper glyphs and no synthetic-weight shimmer during transforms. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * The page backdrop used to be a `background-attachment: fixed` image on
+ * <body>. That forces the browser to repaint the whole backdrop on every
+ * scroll frame and opts the page out of fast, GPU-composited scrolling - the
+ * single largest source of scroll stutter here.
+ *
+ * Painting the identical backdrop into a fixed, promoted pseudo-element looks
+ * the same to the user but lets the compositor keep it on its own layer, so
+ * scrolling no longer repaints it.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--bg-deep);
+  background-image:
     linear-gradient(to right, rgba(229, 222, 201, 0.25) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(229, 222, 201, 0.25) 1px, transparent 1px);
   background-size: 32px 32px;
-  background-attachment: fixed;
-  min-height: 100vh;
+  transform: translateZ(0);
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -3220,3 +3260,50 @@ h2, h3, h4 {
 }
 
 
+
+/* ---------------------------------------------------------
+   SCROLL & MOTION SMOOTHING
+   Behaviour-only additions: nothing here alters layout,
+   colour, spacing or typography.
+   --------------------------------------------------------- */
+
+/*
+ * Scrolling an inner panel to its end used to hand the remaining momentum to
+ * the page behind it, so the whole layout lurched. `contain` stops the chain
+ * at the panel edge.
+ */
+.scrollbar,
+.live-terminal,
+.tabs-container {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * Keep the terminal's newest line pinned while entries stream in, without the
+ * layout shifting as the list grows.
+ */
+.live-terminal {
+  overflow-anchor: auto;
+}
+
+/*
+ * Respect the OS "reduce motion" setting. The design has ~65 transitions and
+ * several looping keyframe animations; on low-powered machines and for users
+ * with vestibular sensitivity these are the difference between smooth and
+ * unusable. Motion is neutralised, but every final state stays identical.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}

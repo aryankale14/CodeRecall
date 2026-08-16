@@ -1,26 +1,15 @@
-import google.generativeai as genai
-import google.generativeai.client as genai_client
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import RepositoryFile
+from app.services.gemini_pool import get_pool
 from app.services.limiter import generate_content_with_fallback
 
 settings = get_settings()
 
-# ---------------------------------------------------------
-# SETUP RAG LLM CLIENT
-# ---------------------------------------------------------
-
-# We use Key 3 for all RAG interactions to keep chat latency low 
-# and avoid rate limits from the background map-reduce workers.
-genai.configure(api_key=settings.GEMINI_API_KEY_RAG)
-
-embeddings_model = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-2", 
-    google_api_key=settings.GEMINI_API_KEY_RAG
-)
+# Key selection is delegated to GeminiPool. The previous module-level
+# genai.configure() mutated process-global state that the background map phase
+# also wrote to, so a chat during an ingest could repoint the worker's key.
 
 async def ask_question(repo_url: str, question: str, db: Session, user_id: str = "mock_local_developer_uid") -> str:
     """
@@ -30,8 +19,7 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
     """
     
     # 1. Convert user's question into a vector
-    embeddings_model.google_api_key = settings.GEMINI_API_KEY_RAG
-    question_vector = await embeddings_model.aembed_query(question)
+    question_vector = await get_pool().embed_one(question)
     
     # 2. Perform Cosine Similarity Search in PostgreSQL
     # pgvector provides the `cosine_distance` method. 
@@ -76,9 +64,6 @@ async def ask_question(repo_url: str, question: str, db: Session, user_id: str =
     context_text = "\n".join(context_blocks)
 
     # 5. Generate Answer using the Gemini Chat Model
-    # Force the local client configuration to use the correct API key atomically
-    genai.configure(api_key=settings.GEMINI_API_KEY_RAG)
-    
     prompt = f"""
     You are an expert AI Code Assistant. Answer the user's question about their codebase using the provided project overview and code context.
     Always cite the file paths when you refer to specific logic.

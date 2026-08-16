@@ -2,23 +2,17 @@ import json
 import asyncio
 from sqlalchemy.orm import Session
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
-import google.generativeai as genai
-import google.generativeai.client as genai_client
 from google.api_core.exceptions import GoogleAPICallError, InvalidArgument, PermissionDenied, NotFound
 
 from app.config import get_settings
 from app.models import RepositoryFile
 from app.pipeline_logs import add_pipeline_log
-from app.services.limiter import space_request, generate_content_with_fallback
+from app.services.gemini_pool import AllKeysExhausted
+from app.services.limiter import generate_content_with_fallback
 
 settings = get_settings()
 
-# ---------------------------------------------------------
-# SETUP REDUCE LLM CLIENT
-# ---------------------------------------------------------
-
-# We specifically use Key 2 for the massive context Reduce Phase
-genai.configure(api_key=settings.GEMINI_API_KEY_REDUCE)
+# Key selection for the Reduce phase is delegated to GeminiPool.
 
 async def generate_global_report(repo_url: str, db: Session, user_id: str = "mock_local_developer_uid"):
     """
@@ -61,27 +55,29 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
     all_vulns_text = json.dumps(compiled_vulnerabilities, indent=2)
 
     def is_transient_error(exception):
+        """Quota errors are handled by GeminiPool's key rotation, not by retrying here."""
+        if isinstance(exception, AllKeysExhausted):
+            return False
         # Do not retry if it's InvalidArgument (400), PermissionDenied (403), or NotFound (404)
         if isinstance(exception, (InvalidArgument, PermissionDenied, NotFound)):
             return False
-        # Only retry on 429, 500, 503, 504 or network/timeout issues
+        # Only retry genuine server/network faults
         if isinstance(exception, GoogleAPICallError):
-            return exception.code in (429, 500, 503, 504)
+            return exception.code in (500, 503, 504)
         if isinstance(exception, (asyncio.TimeoutError, ConnectionError, IOError)):
             return True
-        
-        # Check string representation for rate limits in wrapped exceptions
+
         err_str = str(exception).upper()
-        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str or "500" in err_str or "503" in err_str:
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "QUOTA" in err_str:
+            return False
+        if "500" in err_str or "503" in err_str:
             return True
-            
+
         return False
 
     # 3. Fire off the Master Explainer and Master Security Agent in parallel
-    # We use the configured settings.GEMINI_MODEL_REDUCE model (e.g. Gemini 3.5 Flash)
+    # We use the configured settings.GEMINI_MODEL_REDUCE model, which is
     # perfect for reading thousands of summaries at once!
-    # Force the local client configuration to use the correct API key atomically
-    genai.configure(api_key=settings.GEMINI_API_KEY_REDUCE)
     model_name = settings.GEMINI_MODEL_REDUCE
 
     @retry(
@@ -109,7 +105,6 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
         FILE SUMMARIES:
         {all_summaries_text}
         """
-        await space_request()
         return await generate_content_with_fallback(model_name, prompt)
 
     @retry(
@@ -159,7 +154,6 @@ async def generate_global_report(repo_url: str, db: Session, user_id: str = "moc
         RAW VULNERABILITIES:
         {all_vulns_text}
         """
-        await space_request()
         return await generate_content_with_fallback(model_name, prompt)
 
     # Run both massive prompts concurrently

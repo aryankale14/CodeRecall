@@ -2,6 +2,7 @@ import os
 import tempfile
 import git
 import uuid
+from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 from app.models import RepositoryFile
 from app.services.sanitizer import FileSanitizer
@@ -10,6 +11,52 @@ from app.pipeline_logs import add_pipeline_log
 # Disable Git interactive credential prompting and ssh warning hangs
 os.environ["GIT_TERMINAL_PROMPT"] = "0"
 os.environ["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes"
+
+# Only public HTTP(S) git hosts may be cloned. Without this check a repo_url of
+# "file:///srv/some/repo" makes the server clone its OWN filesystem and serve
+# the contents back through the UI.
+ALLOWED_GIT_HOSTS = {
+    "github.com", "www.github.com",
+    "gitlab.com", "www.gitlab.com",
+    "bitbucket.org", "www.bitbucket.org",
+}
+
+# Hosts that resolve to the machine itself or to cloud metadata endpoints.
+BLOCKED_HOSTNAMES = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "169.254.169.254"}
+
+
+def validate_repo_url(repo_url: str) -> str:
+    """
+    Reject anything that is not a public HTTP(S) repository on a known host.
+
+    Raises ValueError with a user-safe message; the caller surfaces it as a
+    normal ingestion failure.
+    """
+    if not repo_url or not repo_url.strip():
+        raise ValueError("Repository URL is required.")
+
+    url = repo_url.strip()
+    parsed = urlparse(url)
+
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise ValueError(
+            "Only http:// and https:// repository URLs are supported. "
+            "Local paths, file://, git://, ssh:// and ext:// are not allowed."
+        )
+
+    hostname = (parsed.hostname or "").lower()
+    if not hostname or hostname in BLOCKED_HOSTNAMES:
+        raise ValueError("That host is not allowed.")
+
+    if hostname not in ALLOWED_GIT_HOSTS:
+        allowed = ", ".join(sorted(h for h in ALLOWED_GIT_HOSTS if not h.startswith("www.")))
+        raise ValueError(f"Only repositories hosted on {allowed} can be analysed.")
+
+    # Credentials in the URL would be written into the clone config.
+    if parsed.username or parsed.password:
+        raise ValueError("Repository URLs must not contain embedded credentials.")
+
+    return url
 
 
 # A very simple map to guess the language based on extension (Static Analysis)
@@ -43,6 +90,9 @@ def ingest_repository(repo_url: str, db: Session, user_id: str = "mock_local_dev
     files to the database. Returns a list of pending file IDs to be processed.
     """
     pending_file_ids = []
+
+    # Reject non-public / non-HTTP targets before anything touches the disk.
+    repo_url = validate_repo_url(repo_url)
 
     # Clear out any previous database entries for this repo to prevent duplicate files
     db.query(RepositoryFile).filter(

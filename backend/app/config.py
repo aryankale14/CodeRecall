@@ -32,12 +32,26 @@ class Settings(BaseSettings):
     # ---------------------------------------------------------
     # MODEL CONFIGURATIONS - Defaulting to latest GA models
     # ---------------------------------------------------------
+    # Every phase runs on gemini-3.1-flash-lite: it carries the highest
+    # free-tier request-per-day allowance, and the 2.x series is not available
+    # to newly created API keys.
     GEMINI_MODEL_MAP: str = "gemini-3.1-flash-lite"
-    GEMINI_MODEL_REDUCE: str = "gemini-3.5-flash"
-    GEMINI_MODEL_RAG: str = "gemini-3.5-flash"
+    GEMINI_MODEL_REDUCE: str = "gemini-3.1-flash-lite"
+    GEMINI_MODEL_RAG: str = "gemini-3.1-flash-lite"
 
     # The Firebase Project ID, used to verify authentications
     FIREBASE_PROJECT_ID: str = "code-reviewer-9019f"
+
+    # ---------------------------------------------------------
+    # AUTH
+    # ---------------------------------------------------------
+    # Enables the local mock-developer login bypass. This MUST stay False in
+    # any deployed environment: when true, the fixed token below authenticates
+    # as a real user without any signature check.
+    ALLOW_MOCK_AUTH: bool = False
+
+    # Email granted admin privileges (unlimited scans, analytics access).
+    ADMIN_EMAIL: str = "aryankale1410@gmail.com"
 
     class Config:
         # Tells pydantic to load variables from a file named ".env"

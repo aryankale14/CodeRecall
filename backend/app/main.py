@@ -44,6 +44,21 @@ try:
 except Exception as e:
     print(f"[WARNING] Database column alteration failed for created_at: {e}. If the column already exists, this is fine.")
 
+# Any row left in "processing" belongs to a background task that died with the
+# previous process. Nothing will ever finish it, so the UI would sit on a
+# spinner forever. Reset them to "pending" so a re-scan picks them up.
+try:
+    with engine.connect() as conn:
+        from sqlalchemy import text
+        result = conn.execute(text(
+            "UPDATE repository_files SET status = 'pending' WHERE status = 'processing';"
+        ))
+        conn.commit()
+        if result.rowcount:
+            print(f"[INFO] Reset {result.rowcount} file(s) stranded in 'processing' by a previous run.")
+except Exception as e:
+    print(f"[WARNING] Could not reset stranded 'processing' rows: {e}")
+
 # Migrate local JSON user mappings to the database if the file exists
 try:
     import os
@@ -91,39 +106,47 @@ app.add_middleware(
 # ---------------------------------------------------------
 # GEMINI API KEY VERIFICATION PRE-CHECKS
 # ---------------------------------------------------------
+# Verification results are cached: key validity changes rarely, but this ran on
+# every single ingest and spent one real generation call per key just to say
+# "yes, still valid" - six requests of the very quota we are short of.
+_key_check_cache: dict[str, tuple[float, str | None]] = {}
+_KEY_CHECK_TTL_SECONDS = 900.0
+
+
 async def verify_gemini_key(api_key: str) -> str | None:
     """
-    Verify if a Gemini API key is valid and has remaining quota.
-    Returns an error message string if invalid/exhausted, or None if valid.
+    Verify that a Gemini API key is usable. Returns an error message, or None if valid.
+
+    Uses ListModels, which is not metered against the generation quota, so a
+    preflight check no longer eats into the budget it is protecting. Quota
+    state is deliberately NOT probed here - GeminiPool discovers an exhausted
+    key from the real call and rotates past it.
     """
     if not api_key:
         return "API Key is missing."
+
+    import time as _time
+    cached = _key_check_cache.get(api_key)
+    if cached and _time.time() - cached[0] < _KEY_CHECK_TTL_SECONDS:
+        return cached[1]
+
+    result: str | None
     try:
-        import google.generativeai as genai
-        import google.generativeai.client as genai_client
-        # Configure the key atomically
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-3.5-flash")
-        model._client = genai_client.get_default_generative_client()
-        # Make a tiny lightweight call
-        await model.generate_content_async(
-            "Ping",
-            generation_config=genai.GenerationConfig(max_output_tokens=1)
-        )
-        return None
-    except ResourceExhausted as e:
-        return "API Key has exhausted its quota or prepayment balance (429 ResourceExhausted)."
-    except PermissionDenied as e:
-        return "API Key is invalid or lacks permissions (403 PermissionDenied)."
-    except GoogleAPICallError as e:
-        if e.code == 429:
-            return "API Key has exhausted its quota or prepayment balance (429 ResourceExhausted)."
-        if e.code == 403:
-            return "API Key is invalid or lacks permissions (403 PermissionDenied)."
-        return f"API Call failed: {e.message}"
+        from google import genai as _genai
+        client = _genai.Client(api_key=api_key)
+        await asyncio.to_thread(lambda: next(iter(client.models.list()), None))
+        result = None
     except Exception as e:
-        # Ignore transient network validation errors to avoid blocking startup if offline
-        return f"Validation error: {str(e)}"
+        text = str(e)
+        if "403" in text or "PERMISSION_DENIED" in text.upper():
+            result = "API Key is invalid or lacks permissions (403 PermissionDenied)."
+        elif "400" in text and "API_KEY_INVALID" in text.upper():
+            result = "API Key is malformed or not recognised (400 API_KEY_INVALID)."
+        else:
+            result = f"Validation error: {text[:200]}"
+
+    _key_check_cache[api_key] = (_time.time(), result)
+    return result
 
 # ---------------------------------------------------------
 # Pydantic Schemas for Request Validation
@@ -163,7 +186,7 @@ async def ingest_repo(
     
     # 12-hour rate limiting check for all users except the admin
     user_email = current_user.get("email")
-    if user_email != "aryankale1410@gmail.com":
+    if user_email != get_settings().ADMIN_EMAIL:
         twelve_hours_ago = datetime.now(timezone.utc) - timedelta(hours=12)
         
         # Query distinct repository URLs scanned by this user in the last 12 hours
@@ -195,16 +218,15 @@ async def ingest_repo(
     
     valid_key_pool = []
     verified_status = {}
-    
-    # Unique non-empty keys to verify
-    for key in set(all_keys):
-        if not key:
-            continue
-        err = await verify_gemini_key(key)
+
+    # Unique non-empty keys, verified concurrently (cached for 15 minutes).
+    unique_keys = list(dict.fromkeys(k for k in all_keys if k))
+    errors = await asyncio.gather(*[verify_gemini_key(k) for k in unique_keys])
+    for key, err in zip(unique_keys, errors):
         verified_status[key] = {"valid": not err, "error": err}
         if not err:
             valid_key_pool.append(key)
-                
+
     if not valid_key_pool:
         # Build comprehensive error logs
         err_msg = "All configured Gemini API keys (including fallbacks) are invalid or exhausted.\n"
@@ -224,46 +246,12 @@ async def ingest_repo(
                 err_msg += f"- {name}: Missing/empty key\n"
         return {"status": "error", "message": err_msg}
         
-    # Helper to check if a specific key is valid
-    def is_valid(key: str) -> bool:
-        return key in verified_status and verified_status[key]["valid"]
-        
-    # 2. Map Key Resolution
-    if is_valid(settings.GEMINI_API_KEY_MAP):
-        pass
-    elif is_valid(settings.GEMINI_API_KEY_MAP_FALLBACK):
-        print("[FALLBACK] Map Key failed. Using GEMINI_API_KEY_MAP_FALLBACK with gemini-3.1-flash-lite.")
-        settings.GEMINI_API_KEY_MAP = settings.GEMINI_API_KEY_MAP_FALLBACK
-        settings.GEMINI_MODEL_MAP = "gemini-3.1-flash-lite"
-    else:
-        print("[WARNING] Both Map Key and its Fallback failed! Using the first valid key in the pool.")
-        settings.GEMINI_API_KEY_MAP = valid_key_pool[0]
-        settings.GEMINI_MODEL_MAP = "gemini-3.1-flash-lite"
-        
-    # 3. Reduce Key Resolution
-    if is_valid(settings.GEMINI_API_KEY_REDUCE):
-        pass
-    elif is_valid(settings.GEMINI_API_KEY_REDUCE_FALLBACK):
-        print("[FALLBACK] Reduce Key failed. Using GEMINI_API_KEY_REDUCE_FALLBACK with gemini-3.5-flash.")
-        settings.GEMINI_API_KEY_REDUCE = settings.GEMINI_API_KEY_REDUCE_FALLBACK
-        settings.GEMINI_MODEL_REDUCE = "gemini-3.5-flash"
-    else:
-        print("[WARNING] Both Reduce Key and its Fallback failed! Using the first valid key in the pool.")
-        settings.GEMINI_API_KEY_REDUCE = valid_key_pool[0]
-        settings.GEMINI_MODEL_REDUCE = "gemini-3.5-flash"
-        
-    # 4. RAG Key Resolution
-    if is_valid(settings.GEMINI_API_KEY_RAG):
-        pass
-    elif is_valid(settings.GEMINI_API_KEY_RAG_FALLBACK):
-        print("[FALLBACK] RAG Key failed. Using GEMINI_API_KEY_RAG_FALLBACK with gemini-3.5-flash.")
-        settings.GEMINI_API_KEY_RAG = settings.GEMINI_API_KEY_RAG_FALLBACK
-        settings.GEMINI_MODEL_RAG = "gemini-3.5-flash"
-    else:
-        print("[WARNING] Both RAG Key and its Fallback failed! Using the first valid key in the pool.")
-        settings.GEMINI_API_KEY_RAG = valid_key_pool[0]
-        settings.GEMINI_MODEL_RAG = "gemini-3.5-flash"
-    
+    # Per-role key assignment used to happen here, reshuffling settings on every
+    # ingest. GeminiPool now owns key selection: it holds every valid key and
+    # rotates on the actual quota response, so there is nothing to pre-assign.
+    print(f"[INFO] {len(valid_key_pool)}/{len(unique_keys)} Gemini key(s) verified; "
+          f"pool will rotate across them as quota allows.")
+
     # 1. Phase 1: Ingestion & Static Analysis (Run in a thread pool to avoid blocking the event loop)
     # This clones the repo, filters files, and saves pending files to DB.
     clear_pipeline_logs(repo_url)
@@ -341,116 +329,107 @@ async def stop_repo(
     return {"status": "success", "message": "Successfully stopped and reset the repository processing."}
 
 @app.get("/api/repo/logs")
-def get_repo_logs(repo_url: str):
-    """Get the live pipeline log entries for a repository."""
+def get_repo_logs(
+    repo_url: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get the live pipeline log entries for a repository.
+
+    Requires auth and ownership: the logs contain the repository's file paths,
+    and this endpoint previously accepted any repo_url from any caller with no
+    token at all.
+    """
+    owns_repo = db.query(RepositoryFile.id).filter(
+        RepositoryFile.repo_url == repo_url,
+        RepositoryFile.user_id == current_user["uid"]
+    ).first() is not None
+
+    if not owns_repo:
+        return []
+
     return get_pipeline_logs(repo_url)
+
+def _status_counts_by_repo(db: Session, user_id: str, repo_url: str | None = None):
+    """
+    Return {repo_url: {status: count, "__report__": bool}} in ONE query.
+
+    This used to be five COUNT queries per repository, re-run by the frontend's
+    3-second poll, which is what made the progress panel lag behind the work.
+    """
+    from sqlalchemy import case, func
+
+    query = db.query(
+        RepositoryFile.repo_url,
+        RepositoryFile.status,
+        func.count().label("n"),
+        func.sum(
+            case((RepositoryFile.file_path == "__GLOBAL_REPORT__", 1), else_=0)
+        ).label("reports"),
+    ).filter(RepositoryFile.user_id == user_id)
+
+    if repo_url is not None:
+        query = query.filter(RepositoryFile.repo_url == repo_url)
+
+    rows = query.group_by(RepositoryFile.repo_url, RepositoryFile.status).all()
+
+    out: dict[str, dict] = {}
+    for r_url, r_status, n, reports in rows:
+        entry = out.setdefault(r_url, {"__report__": False})
+        if reports:
+            entry["__report__"] = True
+        # The global report row must not be counted as an analysed file.
+        entry[r_status] = entry.get(r_status, 0) + (n - (reports or 0))
+    return out
+
+
+def _summarise(repo_url: str, counts: dict) -> dict:
+    has_report = counts.get("__report__", False)
+    pending = counts.get("pending", 0)
+    processing = counts.get("processing", 0)
+    completed = counts.get("completed", 0)
+    errored = counts.get("error", 0)
+
+    if has_report:
+        status = "completed"
+    elif processing > 0:
+        status = "processing"
+    elif pending > 0:
+        status = "pending"
+    else:
+        status = "completed" if completed > 0 else "unknown"
+
+    return {
+        "repo_url": repo_url,
+        "total_files": pending + processing + completed + errored,
+        "completed_files": completed,
+        "pending_files": pending,
+        "processing_files": processing,
+        "error_files": errored,
+        "status": status,
+        "has_report": has_report,
+    }
+
 
 @app.get("/api/repos")
 def list_repos(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """List all distinct repositories in the database with their current processing status, isolated by user."""
-    user_id = current_user["uid"]
-    # Find all distinct repo URLs belonging to the current user
-    repos = db.query(RepositoryFile.repo_url).filter(
-        RepositoryFile.user_id == user_id
-    ).distinct().all()
-    
-    result = []
-    for (repo_url,) in repos:
-        # Check if a global report is complete
-        has_report = db.query(RepositoryFile).filter(
-            RepositoryFile.repo_url == repo_url,
-            RepositoryFile.user_id == user_id,
-            RepositoryFile.file_path == "__GLOBAL_REPORT__"
-        ).first() is not None
-
-        # Fetch status counts
-        pending_count = db.query(RepositoryFile).filter(
-            RepositoryFile.repo_url == repo_url,
-            RepositoryFile.user_id == user_id,
-            RepositoryFile.status == "pending",
-            RepositoryFile.file_path != "__GLOBAL_REPORT__"
-        ).count()
-
-        processing_count = db.query(RepositoryFile).filter(
-            RepositoryFile.repo_url == repo_url,
-            RepositoryFile.user_id == user_id,
-            RepositoryFile.status == "processing",
-            RepositoryFile.file_path != "__GLOBAL_REPORT__"
-        ).count()
-
-        completed_count = db.query(RepositoryFile).filter(
-            RepositoryFile.repo_url == repo_url,
-            RepositoryFile.user_id == user_id,
-            RepositoryFile.status == "completed",
-            RepositoryFile.file_path != "__GLOBAL_REPORT__"
-        ).count()
-
-        error_count = db.query(RepositoryFile).filter(
-            RepositoryFile.repo_url == repo_url,
-            RepositoryFile.user_id == user_id,
-            RepositoryFile.status == "error",
-            RepositoryFile.file_path != "__GLOBAL_REPORT__"
-        ).count()
-
-        # Determine aggregate status
-        if has_report:
-            status = "completed"
-        elif processing_count > 0:
-            status = "processing"
-        elif pending_count > 0:
-            status = "pending"
-        else:
-            status = "completed" if completed_count > 0 else "unknown"
-
-        result.append({
-            "repo_url": repo_url,
-            "total_files": pending_count + processing_count + completed_count + error_count,
-            "completed_files": completed_count,
-            "pending_files": pending_count,
-            "processing_files": processing_count,
-            "error_files": error_count,
-            "status": status,
-            "has_report": has_report
-        })
-    return result
+    counts = _status_counts_by_repo(db, current_user["uid"])
+    return [_summarise(url, c) for url, c in counts.items()]
 
 @app.get("/api/repo/status")
 def repo_status(repo_url: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Get the live processing status and file counts for a specific repository, isolated by user."""
     user_id = current_user["uid"]
-    has_report = db.query(RepositoryFile).filter(
-        RepositoryFile.repo_url == repo_url,
-        RepositoryFile.user_id == user_id,
-        RepositoryFile.file_path == "__GLOBAL_REPORT__"
-    ).first() is not None
 
-    pending_count = db.query(RepositoryFile).filter(
-        RepositoryFile.repo_url == repo_url,
-        RepositoryFile.user_id == user_id,
-        RepositoryFile.status == "pending",
-        RepositoryFile.file_path != "__GLOBAL_REPORT__"
-    ).count()
-
-    processing_count = db.query(RepositoryFile).filter(
-        RepositoryFile.repo_url == repo_url,
-        RepositoryFile.user_id == user_id,
-        RepositoryFile.status == "processing",
-        RepositoryFile.file_path != "__GLOBAL_REPORT__"
-    ).count()
-
-    completed_count = db.query(RepositoryFile).filter(
-        RepositoryFile.repo_url == repo_url,
-        RepositoryFile.user_id == user_id,
-        RepositoryFile.status == "completed",
-        RepositoryFile.file_path != "__GLOBAL_REPORT__"
-    ).count()
-
-    error_count = db.query(RepositoryFile).filter(
-        RepositoryFile.repo_url == repo_url,
-        RepositoryFile.user_id == user_id,
-        RepositoryFile.status == "error",
-        RepositoryFile.file_path != "__GLOBAL_REPORT__"
-    ).count()
+    # Single grouped query instead of five separate COUNTs.
+    counts = _status_counts_by_repo(db, user_id, repo_url).get(repo_url, {})
+    has_report = counts.get("__report__", False)
+    pending_count = counts.get("pending", 0)
+    processing_count = counts.get("processing", 0)
+    completed_count = counts.get("completed", 0)
+    error_count = counts.get("error", 0)
 
     # Check if any phase failed in the logs
     logs = get_pipeline_logs(repo_url)
@@ -635,7 +614,7 @@ def get_admin_analytics(db: Session = Depends(get_db), current_user: dict = Depe
     Admin-only analytics endpoint.
     Returns detailed platform metrics including per-user breakdowns.
     """
-    if current_user["email"] != "aryankale1410@gmail.com":
+    if current_user["email"] != get_settings().ADMIN_EMAIL:
         raise HTTPException(status_code=403, detail="Access denied. Admin privileges required.")
 
     total_repos = db.query(RepositoryFile.repo_url).distinct().count()
